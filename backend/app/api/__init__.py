@@ -14,4 +14,3 @@ api_router.include_router(analysis_router, prefix="/suppliers", tags=["Analysis 
 api_router.include_router(graph_router, prefix="/suppliers", tags=["Knowledge Graph"])
 api_router.include_router(claims_router, prefix="/claims", tags=["Claim Verification"])
 api_router.include_router(chat_router, prefix="/chat", tags=["AI Analyst Chat"])
-# API router aggregate

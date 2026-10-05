@@ -42,7 +42,7 @@ DEMO_SUPPLIERS = [
                 "evidence_id": "ev-gst-1",
                 "source_type": "GST Portal & Registration Certificate",
                 "title": "Form GST REG-06",
-                "snippet": "GSTIN 09ABCDE1234F125 registered to ABC Packaging Pvt Ltd, Status: Active. State: Uttar Pradesh.",
+                "snippet": "GSTIN 09ABCDE1234F125 (embedded PAN ABCDE1234F) registered to ABC Packaging Pvt Ltd, Status: Active. State: Uttar Pradesh.",
                 "reliability_score": 0.99
             },
             {

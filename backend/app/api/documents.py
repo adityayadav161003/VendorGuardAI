@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.models.entities import Supplier, Document, ExtractedEntity
 from app.schemas.document import DocumentResponse
 from app.services.document_ai import document_ai_service
+from app.services.audit import record_event
 
 router = APIRouter()
 
@@ -92,6 +93,11 @@ async def upload_document(
     db.commit()
     db.refresh(doc_record)
 
-    return doc_record
+    record_event(db, "DOCUMENT_UPLOADED", doc_record.document_id, details={
+        "supplier_id": supplier_id,
+        "document_type": doc_record.document_type,
+        "entities_extracted": len(extracted_entities),
+    })
+    db.commit()
 
-# Documents upload router
+    return doc_record

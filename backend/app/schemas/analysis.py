@@ -26,6 +26,8 @@ class ClaimVerification(BaseModel):
     confidence_score: float
     evidence_snippet: Optional[str] = None
     source_doc_name: Optional[str] = None
+    evidence_id: Optional[str] = None
+    reviewer_state: str = Field(default="PENDING", description="PENDING, APPROVED, OVERRIDDEN, REJECTED")
 
 class AnalysisReportResponse(BaseModel):
     analysis_id: str
@@ -38,6 +40,20 @@ class AnalysisReportResponse(BaseModel):
     key_findings: List[KeyFinding]
     claims: List[ClaimVerification]
     model_version: str
+    generated_at: datetime
+    data_source: str = Field(default="NO_EVIDENCE", description="UPLOADED_DOCUMENTS, DEMO_FIXTURES or NO_EVIDENCE")
+    document_count: int = 0
+
+class ClaimReviewRequest(BaseModel):
+    reviewer_id: str = Field(..., description="Identifier of the human reviewer")
+    action: str = Field(..., description="APPROVED, OVERRIDDEN or REJECTED")
+    comment: Optional[str] = None
+
+class AlertResponse(BaseModel):
+    severity: str
+    category: str
+    message: str
+    source_reference: Optional[str] = None
     generated_at: datetime
 
 class ClaimVerifyRequest(BaseModel):
@@ -64,8 +80,3 @@ class ChatResponse(BaseModel):
 
 class CompareSuppliersRequest(BaseModel):
     supplier_ids: List[str]
-
-# Risk evaluation schemas
-
-# Verification models
-# Comparison DTO

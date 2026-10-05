@@ -29,5 +29,3 @@ def get_supplier_relationship_graph(supplier_id: str, db: Session = Depends(get_
 
     graph_payload = graph_engine.build_supplier_subgraph(supplier_data)
     return graph_payload
-
-# Graph router
