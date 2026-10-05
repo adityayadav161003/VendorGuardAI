@@ -18,6 +18,8 @@ PATTERNS = {
     "BANK_ACCOUNT": r"\b([0-9]{9,18})\b",
     "EXPIRY_DATE": r"(?:expires?|valid(?:ity)?(?:\s+till|\s+upto)?|expiry\s+date)[\s:]*([0-9]{1,2}[-/.][0-9]{1,2}[-/.][0-9]{2,4}|[0-9]{4}[-/.][0-9]{1,2}[-/.][0-9]{1,2})",
     "DATE": r"\b([0-9]{1,2}[-/.][0-9]{1,2}[-/.][0-9]{2,4}|[0-9]{4}[-/.][0-9]{1,2}[-/.][0-9]{1,2})\b",
+    "ACCOUNT_HOLDER": r"(?:account\s+holder|under\s+name|held\s+by|in\s+the\s+name\s+of|operated\s+by)[\s:]*[\"']?([A-Za-z][A-Za-z0-9&.,'\- ]{2,60}?)[\"']?\s*(?:,|\.|$|\n)",
+    "INCORPORATION_YEAR": r"(?:incorporated|registered|established|incorporation\s+date)[^.\n]{0,40}?\b(19[89]\d|20[0-2]\d)\b",
 }
 
 class DocumentAIService:
@@ -120,15 +122,3 @@ class DocumentAIService:
         return extracted
 
 document_ai_service = DocumentAIService()
-
-# SHA-256 calculation
-
-# PDF page parser
-# GSTIN regex pattern
-# PAN regex
-# CIN and IFSC patterns
-# Context snippet helper
-# Director extraction
-# Window bounds
-# Text file fallback
-# Broadened GSTIN regex

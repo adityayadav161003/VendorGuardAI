@@ -158,12 +158,105 @@ class ConsistencyService:
                 "message": f"Certificate valid until {parsed_date.isoformat()} ({delta_days} days remaining)."
             }
 
-consistency_service = ConsistencyService()
+    def check_entity_conflicts_across_documents(self, entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        AC3 for user-uploaded documents: groups extracted entities by type across
+        documents and flags contradictory values, citing both source documents.
+        Each entity dict: {entity_type, entity_value, document_name, page_number}.
+        """
+        findings: List[Dict[str, Any]] = []
+        by_type: Dict[str, List[Dict[str, Any]]] = {}
+        for ent in entities:
+            etype = ent.get("entity_type", "")
+            if etype in {"GSTIN", "PAN", "BANK_ACCOUNT", "IFSC", "CIN", "LEGAL_NAME",
+                         "ACCOUNT_HOLDER", "EXPIRY_DATE"}:
+                by_type.setdefault(etype, []).append(ent)
 
-# Corporate suffix cleaning
-# Fuzzy matching
-# GSTIN PAN alignment
-# Bank mismatch logic
-# Expiry delta check
-# State code dictionary
-# Empty string handling
+        single_value_types = {
+            "GSTIN": "GSTIN", "PAN": "PAN", "BANK_ACCOUNT": "bank account number",
+            "IFSC": "IFSC code", "CIN": "CIN", "LEGAL_NAME": "legal name",
+        }
+        for etype, label in single_value_types.items():
+            entries = by_type.get(etype, [])
+            distinct = {}
+            for ent in entries:
+                distinct.setdefault(str(ent["entity_value"]).strip().upper(), ent)
+            if len(distinct) > 1:
+                values = list(distinct.values())
+                doc_list = ", ".join(sorted({v.get("document_name", "?") for v in values}))
+                findings.append({
+                    "conflict_type": f"CONFLICTING_{etype}",
+                    "severity": "danger",
+                    "message": (
+                        f"Conflicting {label} values across documents: "
+                        f"{', '.join(sorted(distinct.keys()))} (sources: {doc_list})."
+                    ),
+                    "source_a": f"{values[0]['entity_value']} ({values[0].get('document_name', '?')}, p.{values[0].get('page_number', 1)})",
+                    "source_b": f"{values[1]['entity_value']} ({values[1].get('document_name', '?')}, p.{values[1].get('page_number', 1)})",
+                })
+
+        # PAN embedded inside GSTIN (chars 3-12), across any document pair
+        gstins = [e for e in by_type.get("GSTIN", [])]
+        pans = [e for e in by_type.get("PAN", [])]
+        if gstins and pans:
+            gstin = str(gstins[0]["entity_value"]).strip().upper()
+            if len(gstin) == 15:
+                embedded = gstin[2:12]
+                matching = [p for p in pans if str(p["entity_value"]).strip().upper() == embedded]
+                if not matching:
+                    pan = str(pans[0]["entity_value"]).strip().upper()
+                    findings.append({
+                        "conflict_type": "GSTIN_PAN_MISMATCH",
+                        "severity": "danger",
+                        "message": (
+                            f"Critical mismatch: PAN embedded in GSTIN ({embedded}, from "
+                            f"{gstins[0].get('document_name', '?')}) differs from PAN on record "
+                            f"({pan}, from {pans[0].get('document_name', '?')})."
+                        ),
+                        "source_a": f"GSTIN: {gstin} ({gstins[0].get('document_name', '?')})",
+                        "source_b": f"PAN: {pan} ({pans[0].get('document_name', '?')})",
+                    })
+
+        # Bank account holder vs registered legal name
+        holders = by_type.get("ACCOUNT_HOLDER", [])
+        legal_names = by_type.get("LEGAL_NAME", [])
+        if holders:
+            holder = str(holders[0]["entity_value"]).strip()
+            legal = str(legal_names[0]["entity_value"]).strip() if legal_names else None
+            if legal:
+                sim = self.calculate_similarity(legal, holder)
+                if sim < 0.85:
+                    findings.append({
+                        "conflict_type": "BANK_NAME_MISMATCH",
+                        "severity": "warning" if sim >= 0.60 else "danger",
+                        "message": (
+                            f"Bank account is held under '{holder}' (per "
+                            f"{holders[0].get('document_name', '?')}), which does not match the "
+                            f"registered name '{legal}' (similarity {round(sim, 2)})."
+                        ),
+                        "similarity_score": round(sim, 2),
+                        "source_a": f"Account holder: {holder} ({holders[0].get('document_name', '?')})",
+                        "source_b": f"Legal name: {legal} ({legal_names[0].get('document_name', '?')})",
+                    })
+
+        return findings
+
+    def earliest_expiry_date(self, entities: List[Dict[str, Any]]) -> Optional[str]:
+        """Returns the soonest EXPIRY_DATE entity value (most conservative view)."""
+        parsed = []
+        for ent in entities:
+            if ent.get("entity_type") != "EXPIRY_DATE":
+                continue
+            value = str(ent.get("entity_value", "")).strip()
+            for fmt in ["%d-%m-%Y", "%d/%m/%Y", "%Y-%m-%d", "%d.%m.%Y", "%d-%b-%Y"]:
+                try:
+                    parsed.append((datetime.strptime(value, fmt).date(), value))
+                    break
+                except ValueError:
+                    continue
+        if not parsed:
+            return None
+        parsed.sort()
+        return parsed[0][1]
+
+consistency_service = ConsistencyService()

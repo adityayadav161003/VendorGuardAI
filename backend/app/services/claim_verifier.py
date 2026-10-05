@@ -37,14 +37,37 @@ class ClaimVerifierService:
                 claims.append(s_clean)
         return [c for c in claims if len(c) > 10]
 
+    # Polarity cues used for contradiction detection between claim and evidence
+    CLAIM_NEGATIVE_CUES = re.compile(
+        r"\bnot\s+match\b|\bmismatch\b|\bdiffers?\s+from\b|\binconsistent\b|\bconflicting\b|\bexpired\b|\bdoes\s+not\s+align\b",
+        re.IGNORECASE,
+    )
+    CLAIM_POSITIVE_CUES = re.compile(
+        r"\bmatch(?:es|ing)?\b|\bconsistent\b|\baligns\b|\bvalid\b|\bverified\b|\bbelongs\b|\bheld\s+in\s+the\s+name\s+of\b",
+        re.IGNORECASE,
+    )
+    EVIDENCE_NEGATIVE_CUES = re.compile(
+        r"\bmismatch\b|\bdiffers\b|\bconflicting\b|\bnot\s+match\b|\bexpired\b|\bdiscrepanc|\binconsistent\b",
+        re.IGNORECASE,
+    )
+    EVIDENCE_POSITIVE_CUES = re.compile(
+        r"\bmatch(?:es|ing)?\b|\baligns\b|\bconsistent\b|\bactive\b|\bvalid\b|\bverified\b",
+        re.IGNORECASE,
+    )
+
     def verify_single_claim(self, claim_text: str, evidence_pool: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Evaluates a claim against the evidence pool using semantic token similarity & keyword entailment.
+        Evaluates a claim against the evidence pool using lexical entailment:
+        token overlap + sequence similarity + domain-term boosts, with a
+        polarity check that can label a claim CONTRADICTED when the best
+        matching evidence asserts the opposite of what the claim states.
         """
         claim_lower = claim_text.lower()
-        # Remove common stop words for high signal overlap
         stop_words = {"the", "a", "an", "is", "are", "with", "and", "or", "to", "in", "of", "for", "some", "two", "other", "there", "appears", "be"}
         claim_words = {w for w in re.findall(r"\w+", claim_lower) if w not in stop_words and len(w) > 2}
+
+        claim_negative = bool(self.CLAIM_NEGATIVE_CUES.search(claim_text))
+        claim_positive = (not claim_negative) and bool(self.CLAIM_POSITIVE_CUES.search(claim_text))
 
         best_match = None
         best_score = 0.0
@@ -60,7 +83,7 @@ class ClaimVerifierService:
 
             overlap = len(claim_words.intersection(ev_words)) / max(1, len(claim_words))
             seq_score = SequenceMatcher(None, claim_lower, combined_ev).ratio()
-            
+
             # Boost score if key named entities or domain terms match (e.g. director, gst, bank)
             term_boost = 0.0
             if any(w.startswith("director") for w in claim_words) and any(w.startswith("director") for w in ev_words):
@@ -80,8 +103,19 @@ class ClaimVerifierService:
             status = "INSUFFICIENT_EVIDENCE"
             confidence = 0.40
         elif best_score >= 0.35:
-            status = "SUPPORTED"
-            confidence = round(min(0.99, max(0.85, best_score + 0.35)), 2)
+            ev_negative = bool(self.EVIDENCE_NEGATIVE_CUES.search(best_match.get("snippet", "")))
+            ev_positive = bool(self.EVIDENCE_POSITIVE_CUES.search(best_match.get("snippet", "")))
+
+            if claim_positive and ev_negative:
+                # Claim asserts agreement; best evidence asserts the opposite
+                status = "CONTRADICTED"
+                confidence = round(min(0.97, max(0.60, best_score + 0.40)), 2)
+            elif claim_negative and ev_positive and not ev_negative:
+                status = "CONTRADICTED"
+                confidence = round(min(0.97, max(0.60, best_score + 0.35)), 2)
+            else:
+                status = "SUPPORTED"
+                confidence = round(min(0.99, max(0.85, best_score + 0.35)), 2)
         else:
             status = "INSUFFICIENT_EVIDENCE"
             confidence = round(best_score, 2)
@@ -92,7 +126,7 @@ class ClaimVerifierService:
             "confidence_score": confidence,
             "evidence_id": best_match.get("evidence_id") if best_match else None,
             "evidence_snippet": best_match.get("snippet") if best_match else "No direct backing evidence found in uploaded repository.",
-            "source_doc_name": best_match.get("source_type") or best_match.get("title", "Unknown Source") if best_match else "None"
+            "source_doc_name": (best_match.get("title") or best_match.get("source_type", "Unknown Source")) if best_match else "None"
         }
 
     def verify_analyst_summary(self, summary_text: str, evidence_pool: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -106,10 +140,3 @@ class ClaimVerifierService:
         return results
 
 claim_verifier_service = ClaimVerifierService()
-
-# Atomic claim parser
-# Evidence matching
-# 3-way classification
-# Domain term boosting
-# Provenance attachment
-# Rhetorical phrase filtering
