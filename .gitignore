@@ -60,3 +60,6 @@ Thumbs.db
 # Additional temp files
 *.tmp
 *.bak
+
+# Local tooling (never commit - may contain credentials)
+make_commits.py

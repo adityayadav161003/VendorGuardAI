@@ -46,6 +46,3 @@ def root():
             "docs": "/docs"
         }
     }
-
-# Healthcheck ping
-# CORS middleware allowed origins

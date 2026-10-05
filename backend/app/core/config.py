@@ -27,6 +27,3 @@ class Settings(BaseModel):
 
 settings = Settings()
 settings.init_directories()
-
-# Configuration loader
-# Default host and port

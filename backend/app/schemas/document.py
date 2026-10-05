@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, ConfigDict, Field
 
 class ExtractedEntityResponse(BaseModel):
     entity_id: str
@@ -11,8 +11,7 @@ class ExtractedEntityResponse(BaseModel):
     page_number: int
     snippet: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DocumentResponse(BaseModel):
     document_id: str
@@ -26,7 +25,4 @@ class DocumentResponse(BaseModel):
     metadata_json: Dict[str, Any] = {}
     extracted_entities: List[ExtractedEntityResponse] = []
 
-    class Config:
-        from_attributes = True
-
-# Document response models
+    model_config = ConfigDict(from_attributes=True)

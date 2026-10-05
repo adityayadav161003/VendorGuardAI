@@ -25,4 +25,3 @@ __all__ = [
     "EntityRelation",
     "AuditEvent"
 ]
-# Export all models

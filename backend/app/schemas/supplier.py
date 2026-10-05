@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 class SupplierBase(BaseModel):
     name: str = Field(..., description="Legal or trade name of the supplier")
@@ -25,8 +25,4 @@ class SupplierResponse(SupplierBase):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
-# Supplier DTOs
-# Type annotations
+    model_config = ConfigDict(from_attributes=True)
