@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bot, CheckCircle, AlertCircle, ArrowRight, ShieldCheck, FileText, ThumbsUp, ThumbsDown, XCircle } from 'lucide-react';
 import { AnalysisReport, ClaimVerification } from '../types';
 import { api } from '../services/api';
+import { useAuth } from '../auth/AuthContext';
 
 interface AnalystSummaryProps {
   report: AnalysisReport;
@@ -16,6 +17,7 @@ const REVIEWER_BADGES: Record<string, string> = {
 };
 
 export const AnalystSummary: React.FC<AnalystSummaryProps> = ({ report, onReviewRecorded }) => {
+  const { canReview } = useAuth();
   const [selectedClaim, setSelectedClaim] = useState<ClaimVerification | null>(null);
   const [reviewBusy, setReviewBusy] = useState(false);
 
@@ -131,14 +133,20 @@ export const AnalystSummary: React.FC<AnalystSummaryProps> = ({ report, onReview
               "{selectedClaim.evidence_snippet}"
             </p>
 
-            {/* Human review actions (claim decisions stored separately from model output) */}
+            {/* Human review actions (reviewer/admin only; decisions stored separately from model output) */}
             <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
+              {!canReview && (
+                <span className="text-[10px] text-slate-500">
+                  Reviewer or admin role required to record claim decisions.
+                </span>
+              )}
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${REVIEWER_BADGES[selectedClaim.reviewer_state]}`}>
                 Reviewer: {selectedClaim.reviewer_state}
               </span>
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => recordReview('APPROVED')}
+                  hidden={!canReview}
                   disabled={reviewBusy}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 font-semibold disabled:opacity-50 transition-colors"
                 >
@@ -147,6 +155,7 @@ export const AnalystSummary: React.FC<AnalystSummaryProps> = ({ report, onReview
                 <button
                   onClick={() => recordReview('OVERRIDDEN')}
                   disabled={reviewBusy}
+                  hidden={!canReview}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 font-semibold disabled:opacity-50 transition-colors"
                 >
                   <AlertCircle className="w-3 h-3" /> Override
@@ -154,6 +163,7 @@ export const AnalystSummary: React.FC<AnalystSummaryProps> = ({ report, onReview
                 <button
                   onClick={() => recordReview('REJECTED')}
                   disabled={reviewBusy}
+                  hidden={!canReview}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 font-semibold disabled:opacity-50 transition-colors"
                 >
                   <XCircle className="w-3 h-3" /> Reject

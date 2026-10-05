@@ -113,3 +113,11 @@ export interface ChatMessage {
 }
 
 // TypeScript interfaces
+
+export interface AuthUser {
+  user_id: string;
+  name: string;
+  email: string;
+  role: 'procurement_officer' | 'reviewer' | 'admin';
+  organization: string;
+}

@@ -86,28 +86,34 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
             <Plus className="w-3.5 h-3.5" />
             <span>New Supplier</span>
           </button>
-          <a
-            href={api.exportReportUrl(selectedSupplierId, 'html')}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={() => api.exportReport(selectedSupplierId, 'html').catch(err => alert(err.message))}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] hover:bg-[#28384f] text-slate-300 text-xs font-semibold border border-[#334155] transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Report</span>
-          </a>
-          <a
-            href={api.exportReportUrl(selectedSupplierId, 'json')}
+          </button>
+          <button
+            onClick={() => api.exportReport(selectedSupplierId, 'json').catch(err => alert(err.message))}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] hover:bg-[#28384f] text-slate-300 text-xs font-semibold border border-[#334155] transition-colors"
           >
             <FileJson className="w-3.5 h-3.5" />
             <span>JSON</span>
-          </a>
+          </button>
           <button
-            onClick={() => loadData(selectedSupplierId)}
+            onClick={async () => {
+              setLoading(true);
+              try {
+                await api.reanalyze(selectedSupplierId);
+              } catch (err: any) {
+                console.error('Re-analysis failed:', err);
+              }
+              await loadData(selectedSupplierId);
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] hover:bg-[#28384f] text-slate-300 text-xs font-semibold border border-[#334155] transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Refresh Analysis</span>
+            <span>Re-run Analysis</span>
           </button>
         </div>
       </div>
