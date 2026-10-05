@@ -18,6 +18,8 @@ from app.schemas.analysis import ClaimVerifyRequest, ClaimVerification, ClaimRev
 from app.services.claim_verifier import claim_verifier_service
 from app.services.evidence_store import evidence_store
 from app.services.audit import record_event
+from app.core.security import get_current_user, require_roles
+from app.models.entities import User
 
 router = APIRouter()
 
@@ -25,7 +27,11 @@ ALLOWED_REVIEW_ACTIONS = {"APPROVED", "OVERRIDDEN", "REJECTED"}
 
 
 @router.post("/verify", response_model=ClaimVerification)
-def verify_custom_claim(payload: ClaimVerifyRequest, db: Session = Depends(get_db)):
+def verify_custom_claim(
+    payload: ClaimVerifyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """AC4: verify any text claim against a supplier's evidence, or provided context only."""
     evidence_pool = []
     if payload.supplier_id:
@@ -63,7 +69,7 @@ def verify_custom_claim(payload: ClaimVerifyRequest, db: Session = Depends(get_d
 
 
 @router.get("/{claim_id}", response_model=ClaimVerification)
-def get_claim(claim_id: str, db: Session = Depends(get_db)):
+def get_claim(claim_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     claim = db.query(Claim).filter(Claim.claim_id == claim_id).first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
@@ -88,7 +94,12 @@ def get_claim(claim_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{claim_id}/review", response_model=ClaimVerification)
-def review_claim(claim_id: str, payload: ClaimReviewRequest, db: Session = Depends(get_db)):
+def review_claim(
+    claim_id: str,
+    payload: ClaimReviewRequest,
+    db: Session = Depends(get_db),
+    reviewer: User = Depends(require_roles("reviewer")),
+):
     """Records a human reviewer decision, stored separately from model output."""
     if payload.action not in ALLOWED_REVIEW_ACTIONS:
         raise HTTPException(
@@ -102,12 +113,12 @@ def review_claim(claim_id: str, payload: ClaimReviewRequest, db: Session = Depen
 
     action = ReviewerAction(
         claim_id=claim.claim_id,
-        reviewer_id=payload.reviewer_id,
+        reviewer_id=reviewer.user_id,
         action=payload.action,
         comment=payload.comment,
     )
     db.add(action)
-    record_event(db, f"CLAIM_{payload.action}", claim.claim_id, user_id=payload.reviewer_id, details={
+    record_event(db, f"CLAIM_{payload.action}", claim.claim_id, user_id=reviewer.user_id, details={
         "claim_text": claim.claim_text[:200],
         "model_status": claim.status,
     })

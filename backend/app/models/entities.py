@@ -15,6 +15,7 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=False)
     role = Column(String(50), default="procurement_officer")  # reviewer, admin, procurement_officer
     organization = Column(String(200), default="GLA Enterprise")
+    password_hash = Column(String(255), nullable=True)  # PBKDF2-SHA256; never store plaintext
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     audit_events = relationship("AuditEvent", back_populates="user")

@@ -6,12 +6,14 @@ from app.core.database import get_db
 from app.models.entities import Supplier
 from app.schemas.supplier import SupplierCreate, SupplierResponse, SupplierUpdate
 from app.services.audit import record_event
+from app.core.security import get_current_user, require_roles
+from app.models.entities import User
 from data.fixtures.demo_data import DEMO_SUPPLIERS
 
 router = APIRouter()
 
 @router.get("", response_model=List[SupplierResponse])
-def list_suppliers(db: Session = Depends(get_db)):
+def list_suppliers(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """List all registered suppliers, seeded with demo fixtures if empty."""
     suppliers = db.query(Supplier).all()
     if not suppliers:
@@ -32,7 +34,7 @@ def list_suppliers(db: Session = Depends(get_db)):
     return suppliers
 
 @router.get("/{supplier_id}", response_model=SupplierResponse)
-def get_supplier(supplier_id: str, db: Session = Depends(get_db)):
+def get_supplier(supplier_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     supplier = db.query(Supplier).filter(Supplier.supplier_id == supplier_id).first()
     if not supplier:
         # Fallback check demo fixtures
@@ -54,7 +56,7 @@ def get_supplier(supplier_id: str, db: Session = Depends(get_db)):
     return supplier
 
 @router.post("", response_model=SupplierResponse, status_code=201)
-def create_supplier(payload: SupplierCreate, db: Session = Depends(get_db)):
+def create_supplier(payload: SupplierCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     supplier = Supplier(
         name=payload.name,
         business_type=payload.business_type,
@@ -66,7 +68,9 @@ def create_supplier(payload: SupplierCreate, db: Session = Depends(get_db)):
     db.add(supplier)
     db.commit()
     db.refresh(supplier)
-    record_event(db, "SUPPLIER_CREATED", supplier.supplier_id, details={"name": supplier.name})
+    record_event(db, "SUPPLIER_CREATED", supplier.supplier_id, user_id=current_user.user_id, details={"name": supplier.name})
+    db.commit()
+    supplier.created_by = current_user.user_id
     db.commit()
     return supplier
 
@@ -75,7 +79,12 @@ VALID_SUPPLIER_STATUSES = {"REVIEW_PENDING", "VERIFIED", "FLAGGED", "REJECTED"}
 
 
 @router.patch("/{supplier_id}", response_model=SupplierResponse)
-def update_supplier(supplier_id: str, payload: SupplierUpdate, db: Session = Depends(get_db)):
+def update_supplier(
+    supplier_id: str,
+    payload: SupplierUpdate,
+    db: Session = Depends(get_db),
+    reviewer: User = Depends(require_roles("reviewer")),
+):
     """Edit supplier profile fields / record the human review status decision."""
     supplier = db.query(Supplier).filter(Supplier.supplier_id == supplier_id).first()
     if not supplier:
@@ -96,6 +105,6 @@ def update_supplier(supplier_id: str, payload: SupplierUpdate, db: Session = Dep
 
     db.commit()
     db.refresh(supplier)
-    record_event(db, "SUPPLIER_UPDATED", supplier_id, details={"changed_fields": sorted(changes.keys())})
+    record_event(db, "SUPPLIER_UPDATED", supplier_id, user_id=reviewer.user_id, details={"changed_fields": sorted(changes.keys())})
     db.commit()
     return supplier

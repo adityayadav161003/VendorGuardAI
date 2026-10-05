@@ -45,9 +45,8 @@ class AnalysisReportResponse(BaseModel):
     document_count: int = 0
 
 class ClaimReviewRequest(BaseModel):
-    reviewer_id: str = Field(..., description="Identifier of the human reviewer")
     action: str = Field(..., description="APPROVED, OVERRIDDEN or REJECTED")
-    comment: Optional[str] = None
+    comment: Optional[str] = Field(default=None, max_length=2000)
 
 class AlertResponse(BaseModel):
     severity: str
@@ -57,13 +56,13 @@ class AlertResponse(BaseModel):
     generated_at: datetime
 
 class ClaimVerifyRequest(BaseModel):
-    claim_text: str
+    claim_text: str = Field(..., min_length=5, max_length=5000)
     supplier_id: Optional[str] = None
-    context_text: Optional[str] = None
+    context_text: Optional[str] = Field(default=None, max_length=20000)
 
 class ChatRequest(BaseModel):
     supplier_id: str
-    question: str
+    question: str = Field(..., min_length=3, max_length=1000)
 
 class Citation(BaseModel):
     doc_id: str
@@ -79,4 +78,4 @@ class ChatResponse(BaseModel):
     claims_unsupported: int
 
 class CompareSuppliersRequest(BaseModel):
-    supplier_ids: List[str]
+    supplier_ids: List[str] = Field(..., min_length=2, max_length=10)

@@ -3,11 +3,11 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 class SupplierBase(BaseModel):
-    name: str = Field(..., description="Legal or trade name of the supplier")
-    business_type: str = Field(default="Private Limited")
-    industry: str = Field(default="Manufacturing")
-    website: Optional[str] = None
-    address: Optional[str] = None
+    name: str = Field(..., min_length=2, max_length=200, description="Legal or trade name of the supplier")
+    business_type: str = Field(default="Private Limited", max_length=100)
+    industry: str = Field(default="Manufacturing", max_length=100)
+    website: Optional[str] = Field(default=None, max_length=255)
+    address: Optional[str] = Field(default=None, max_length=2000)
 
 class SupplierCreate(SupplierBase):
     pass

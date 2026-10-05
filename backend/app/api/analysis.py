@@ -10,6 +10,7 @@ sentence it produces against the unified evidence pool before returning it.
 
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone
+import html
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse, HTMLResponse
@@ -33,6 +34,8 @@ from app.services.risk_engine import risk_engine
 from app.services.claim_verifier import claim_verifier_service
 from app.services.evidence_store import evidence_store
 from app.services.audit import record_event
+from app.core.security import get_current_user, require_roles
+from app.models.entities import User
 from data.fixtures.demo_data import DEMO_SUPPLIERS
 
 router = APIRouter()
@@ -60,6 +63,8 @@ def _compose_summary(
     network_signals: List[Dict[str, Any]],
     document_count: int,
     data_source: str,
+    unreadable_count: int = 0,
+    entity_count: int = 0,
 ) -> str:
     """
     Builds the analyst summary from actual findings so that every sentence is
@@ -77,9 +82,28 @@ def _compose_summary(
         )
 
     if data_source == "UPLOADED_DOCUMENTS":
-        sentences.append(
-            f"{document_count} document(s) were submitted for {name} and analyzed for cross-document consistency."
-        )
+        if unreadable_count and unreadable_count >= document_count:
+            return (
+                f"{document_count} document(s) were submitted for {name} but none of them "
+                f"could be read (scanned image without OCR, encrypted or empty file). No "
+                f"content was verified from the uploads; the assessment is not evidence-backed "
+                f"and manual review or a readable copy is required before any onboarding decision."
+            )
+        if unreadable_count:
+            sentences.append(
+                f"{document_count} document(s) were submitted for {name}, of which "
+                f"{unreadable_count} could not be read and were excluded from verification."
+            )
+        else:
+            sentences.append(
+                f"{document_count} document(s) were submitted for {name} and analyzed for cross-document consistency."
+            )
+        if entity_count == 0:
+            sentences.append(
+                "No identifiers such as GSTIN, PAN, CIN or bank details could be extracted "
+                "from the submitted content, so no identity, financial or compliance checks "
+                "could be performed."
+            )
 
     if gstin and pan:
         mismatch = any(f.get("conflict_type") == "GSTIN_PAN_MISMATCH" for f in consistency_findings)
@@ -121,9 +145,11 @@ def _compose_summary(
             f"Director {profile['directors'][0]} is documented in the submitted records."
         )
 
-    has_warnings = any(
-        f.get("severity") in ("warning", "danger") for f in consistency_findings
-    ) or bool(shared)
+    has_warnings = (
+        any(f.get("severity") in ("warning", "danger") for f in consistency_findings)
+        or bool(shared)
+        or (data_source == "UPLOADED_DOCUMENTS" and (entity_count == 0 or unreadable_count > 0))
+    )
     if has_warnings:
         sentences.append(
             "I recommend manual verification of the flagged discrepancies before onboarding."
@@ -263,6 +289,8 @@ def run_analysis(db: Session, supplier: Supplier) -> AnalysisReportResponse:
     evidence_pool = pool["evidence_pool"]
     entities = pool["entities"]
     document_count = pool["document_count"]
+    unreadable_count = pool.get("unreadable_count", 0)
+    entity_count = len(entities)
     data_source = pool["data_source"]
 
     demo_match = next((d for d in DEMO_SUPPLIERS if d["supplier_id"] == supplier.supplier_id), None)
@@ -400,11 +428,16 @@ def run_analysis(db: Session, supplier: Supplier) -> AnalysisReportResponse:
         network_signals=network_signals,
         external_evidence=evidence_pool,
         has_document_evidence=has_document_evidence,
+        unreadable_documents=unreadable_count,
+        total_documents=document_count,
+        extracted_entity_count=entity_count,
+        data_source=data_source,
     )
 
     # 4. Grounded analyst summary + claim-level verification (AC4)
     summary_text = _compose_summary(
-        supplier, profile, consistency_findings, network_signals, document_count, data_source
+        supplier, profile, consistency_findings, network_signals, document_count,
+        data_source, unreadable_count=unreadable_count, entity_count=entity_count,
     )
     verified_claims = claim_verifier_service.verify_analyst_summary(summary_text, evidence_pool)
 
@@ -463,14 +496,22 @@ def run_analysis(db: Session, supplier: Supplier) -> AnalysisReportResponse:
 
 
 @router.post("/{supplier_id}/analyze", response_model=AnalysisReportResponse)
-def analyze_supplier(supplier_id: str, db: Session = Depends(get_db)):
+def analyze_supplier(
+    supplier_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Re-runs the full pipeline: consistency → graph → risk → claim verification."""
     supplier = _resolve_supplier(db, supplier_id)
     return run_analysis(db, supplier)
 
 
 @router.get("/{supplier_id}/report", response_model=AnalysisReportResponse)
-def get_supplier_report(supplier_id: str, db: Session = Depends(get_db)):
+def get_supplier_report(
+    supplier_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Returns the most recent stored analysis, running it first if none exists."""
     supplier = _resolve_supplier(db, supplier_id)
     stored = _stored_report(db, supplier)
@@ -480,7 +521,11 @@ def get_supplier_report(supplier_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{supplier_id}/alerts", response_model=List[AlertResponse])
-def get_supplier_alerts(supplier_id: str, db: Session = Depends(get_db)):
+def get_supplier_alerts(
+    supplier_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Actionable alerts derived from the latest analysis findings."""
     supplier = _resolve_supplier(db, supplier_id)
     report = _stored_report(db, supplier) or run_analysis(db, supplier)
@@ -499,7 +544,12 @@ def get_supplier_alerts(supplier_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{supplier_id}/report/export")
-def export_supplier_report(supplier_id: str, format: str = Query(default="html"), db: Session = Depends(get_db)):
+def export_supplier_report(
+    supplier_id: str,
+    format: str = Query(default="html"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Downloads the evidence-linked report as JSON or a self-contained HTML file."""
     supplier = _resolve_supplier(db, supplier_id)
     report = _stored_report(db, supplier) or run_analysis(db, supplier)
@@ -525,47 +575,54 @@ def export_supplier_report(supplier_id: str, format: str = Query(default="html")
     severity_colors = {"success": "#16a34a", "info": "#2563eb", "warning": "#d97706", "danger": "#dc2626"}
     status_colors = {"SUPPORTED": "#16a34a", "CONTRADICTED": "#dc2626", "INSUFFICIENT_EVIDENCE": "#d97706"}
     level_colors = {"LOW": "#16a34a", "MEDIUM": "#d97706", "HIGH": "#dc2626"}
+    esc = html.escape  # every document-derived string is escaped (stored-XSS defence)
     breakdown_rows = "".join(
-        f"<tr><td>{k.capitalize()}</td><td>{v}</td></tr>" for k, v in report.risk_breakdown.model_dump().items()
+        f"<tr><td>{esc(k.capitalize())}</td><td>{v}</td></tr>" for k, v in report.risk_breakdown.model_dump().items()
     )
     findings_html = "".join(
-        f'<li style="color:{severity_colors.get(f.severity, "#111")}">[{f.severity.upper()}] ({f.category}) '
-        f"{f.message} <em>— {f.source_reference or ''}</em></li>"
+        f'<li style="color:{severity_colors.get(f.severity, "#111")}">[{esc(f.severity.upper())}] ({esc(f.category)}) '
+        f"{esc(f.message)} <em>— {esc(f.source_reference or '')}</em></li>"
         for f in report.key_findings
     )
     claims_html = "".join(
-        f'<li style="color:{status_colors.get(c.status, "#111")}"><b>{c.status}</b> ({c.confidence_score:.2f}, '
-        f"reviewer: {c.reviewer_state}) — {c.claim_text}<br><small>Source: {c.source_doc_name or 'n/a'} | "
-        f"{(c.evidence_snippet or '')[:180]}</small></li>"
+        f'<li style="color:{status_colors.get(c.status, "#111")}"><b>{esc(c.status)}</b> ({c.confidence_score:.2f}, '
+        f"reviewer: {esc(c.reviewer_state)}) — {esc(c.claim_text)}<br><small>Source: {esc(c.source_doc_name or 'n/a')} | "
+        f"{esc((c.evidence_snippet or '')[:180])}</small></li>"
         for c in report.claims
     )
     generated = report.generated_at.strftime("%d %b %Y %H:%M %Z") if report.generated_at else ""
-    html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>VendorGuard AI Report - {report.supplier_name}</title>
+    html_doc = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>VendorGuard AI Report - {esc(report.supplier_name)}</title>
 <style>body{{font-family:'Segoe UI',Arial,sans-serif;max-width:860px;margin:2rem auto;color:#111}}
 h1{{border-bottom:3px solid #2563eb;padding-bottom:.4rem}} .score{{font-size:2.4rem;font-weight:700}}
 table{{border-collapse:collapse}} td{{border:1px solid #ddd;padding:6px 14px}}
 li{{margin:.5rem 0}} small{{color:#555}} .meta{{color:#666;font-size:.85rem}}</style></head>
 <body>
 <h1>VendorGuard AI — Supplier Risk Report</h1>
-<p><b>{report.supplier_name}</b> <span class="meta">(ID {report.supplier_id}, generated {generated}, model {report.model_version})</span></p>
-<p class="score">{report.risk_score}/100 <span style="font-size:1.1rem;color:{level_colors.get(report.risk_level, '#111')}">{report.risk_level} RISK</span></p>
-<p class="meta">Evidence basis: {report.data_source} · {report.document_count} uploaded document(s)</p>
-<h2>Analyst Summary</h2><p>{report.summary}</p>
+<p><b>{esc(report.supplier_name)}</b> <span class="meta">(ID {esc(report.supplier_id)}, generated {esc(generated)}, model {esc(report.model_version)})</span></p>
+<p class="score">{report.risk_score}/100 <span style="font-size:1.1rem;color:{level_colors.get(report.risk_level, '#111')}">{esc(report.risk_level)} RISK</span></p>
+<p class="meta">Evidence basis: {esc(report.data_source)} · {report.document_count} uploaded document(s)</p>
+<h2>Analyst Summary</h2><p>{esc(report.summary)}</p>
 <h2>Risk Breakdown</h2><table>{breakdown_rows}</table>
 <h2>Key Findings</h2><ul>{findings_html or '<li>No findings.</li>'}</ul>
 <h2>Verified Claims</h2><ul>{claims_html or '<li>No claims.</li>'}</ul>
 <p class="meta">Decision-support output only — not a legal determination. Every claim links to the evidence it was checked against; claims marked INSUFFICIENT_EVIDENCE remain unverified.</p>
 </body></html>"""
     return HTMLResponse(
-        content=html,
+        content=html_doc,
         headers={"Content-Disposition": f'inline; filename="vendorguard-report-{supplier_id}.html"'},
     )
 
 
 @router.post("/compare")
-def compare_suppliers(payload: CompareSuppliersRequest, db: Session = Depends(get_db)):
+def compare_suppliers(
+    payload: CompareSuppliersRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Side-by-side comparative risk evaluation for procurement tender review."""
+    if len(payload.supplier_ids) > 10:
+        raise HTTPException(status_code=422, detail="Compare at most 10 suppliers at a time.")
     comparisons = []
     for sid in payload.supplier_ids:
         try:

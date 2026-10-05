@@ -3,12 +3,18 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.entities import Supplier
 from app.services.graph_engine import graph_engine
+from app.core.security import get_current_user
+from app.models.entities import User
 from data.fixtures.demo_data import DEMO_SUPPLIERS
 
 router = APIRouter()
 
 @router.get("/{supplier_id}/graph")
-def get_supplier_relationship_graph(supplier_id: str, db: Session = Depends(get_db)):
+def get_supplier_relationship_graph(
+    supplier_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
     Returns NetworkX generated graph topology (nodes, edges, centrality signals)
     for interactive visualization.

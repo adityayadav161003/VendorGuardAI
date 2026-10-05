@@ -18,6 +18,8 @@ from app.models.entities import Supplier
 from app.schemas.analysis import ChatRequest, ChatResponse, Citation
 from app.services.evidence_store import evidence_store
 from app.services.claim_verifier import claim_verifier_service
+from app.core.security import get_current_user
+from app.models.entities import User
 
 router = APIRouter()
 
@@ -25,7 +27,11 @@ RETRIEVAL_FLOOR = 0.12  # below this, the honest answer is "insufficient evidenc
 
 
 @router.post("", response_model=ChatResponse)
-def chat_with_supplier_data(payload: ChatRequest, db: Session = Depends(get_db)):
+def chat_with_supplier_data(
+    payload: ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     supplier = db.query(Supplier).filter(Supplier.supplier_id == payload.supplier_id).first()
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")
