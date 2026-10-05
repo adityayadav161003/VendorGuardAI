@@ -111,6 +111,28 @@ pytest -v
 
 ---
 
+## 🔌 API Surface
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/api/suppliers` | POST | Create supplier profile (auto-seeds demo suppliers on first list) |
+| `/api/suppliers/{id}` | PATCH | Edit profile fields / record human review status |
+| `/api/suppliers/{id}/documents` | POST | Upload PDF/image/text document (OCR + entity extraction with provenance) |
+| `/api/suppliers/{id}/analyze` | POST | Run full pipeline: cross-document consistency → graph → 6-vector risk → claim verification |
+| `/api/suppliers/{id}/report` | GET | Retrieve the most recent stored analysis |
+| `/api/suppliers/{id}/report/export?format=json\|html` | GET | Download the evidence-linked report |
+| `/api/suppliers/{id}/alerts` | GET | Actionable alerts derived from the latest analysis |
+| `/api/suppliers/{id}/graph` | GET | NetworkX relationship topology with anomaly signals |
+| `/api/suppliers/compare` | POST | Side-by-side comparative risk evaluation |
+| `/api/claims/verify` | POST | Verify an arbitrary claim against a supplier's evidence pool |
+| `/api/claims/{claim_id}` | GET | Fetch a persisted claim with reviewer state |
+| `/api/claims/{claim_id}/review` | POST | Record a human review decision (stored separately from model output) |
+| `/api/chat` | POST | Evidence-grounded analyst Q&A with inline citations |
+
+**How the analysis stays honest:** every attribute is derived from the entities extracted out of *uploaded* documents (GSTIN/PAN cross-checks, bank-holder vs legal name, certificate expiry, cross-document value conflicts, directors, incorporation vintage); demo-fixture evidence is used only for the seeded demo suppliers. The generated analyst summary is decomposed into atomic claims and each one is verified against the unified evidence pool — returning `SUPPORTED`, `CONTRADICTED`, or `INSUFFICIENT_EVIDENCE` — before the report is returned. The chat analyst answers extractively from retrieved passages with citations and explicitly refuses to answer beyond the evidence on file.
+
+---
+
 ## 📖 Research Questions Investigated
 
 1. **RQ1:** How accurately can selected supplier fields be extracted from heterogeneous documents, and which fields are most error-prone?
