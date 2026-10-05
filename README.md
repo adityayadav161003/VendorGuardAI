@@ -103,11 +103,33 @@ npm run dev
 ```
 Access the dashboard at: `http://localhost:5173`
 
-### 3. Run Automated Evaluation Tests
+### 3. Sign In
+The first backend start seeds a bootstrap admin from environment settings:
+
+| | Default |
+| --- | --- |
+| Email | `admin@vendorguard.local` |
+| Password | `Admin@12345` |
+
+Change these via `ADMIN_EMAIL` / `ADMIN_PASSWORD` in your environment (see `.env.example`). New self-registered accounts start with least-privilege **procurement** access; reviewer and admin roles are granted by an administrator. All API endpoints except `/health` and `/api/auth/*` require a Bearer token; claim review and supplier status decisions additionally require the **reviewer** or **admin** role.
+
+### 4. Run Automated Evaluation Tests
 ```bash
 cd backend
 pytest -v
 ```
+
+---
+
+## 🔐 Security Model
+
+- **Authentication:** JWT bearer sessions (PyJWT, HS256). Passwords stored as PBKDF2-HMAC-SHA256 (390k iterations, per-user salt, constant-time verify). Login attempts are rate-limited per (IP, email) with a lockout window.
+- **Authorization:** role hierarchy `procurement_officer < reviewer < admin`; review decisions and supplier status changes are reviewer/admin-only.
+- **Upload hardening:** streamed size enforcement (10 MB) before storage, magic-byte validation (no disguised executables), server-generated storage names (no path traversal), SHA-256 duplicate rejection, page caps on PDF parsing (parser-abuse defence), and UTF-8 validation for text uploads.
+- **Unreadable content is never healthy:** scanned images without OCR or empty/encrypted files are marked `NEEDS_OCR` and force the assessment to HIGH risk ("nothing could be verified") instead of a falsely clean score. Install `pytesseract` + the Tesseract binary to enable image OCR; without it, images are flagged for manual review.
+- **Output safety:** the HTML report export escapes every document-derived string (stored-XSS defence), and responses carry `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy` and `Cache-Control: no-store` headers.
+- **CORS:** explicit origin allow-list (never `*` with credentials).
+- **Known demo-grade limits (documented honestly):** the rate limiter is in-memory (single-process only), JWTs live in `localStorage` (httpOnly cookies are the production hardening step), and the workspace is single-tenant — all authenticated users share the supplier repository. These are the next hardening steps before any shared deployment.
 
 ---
 
