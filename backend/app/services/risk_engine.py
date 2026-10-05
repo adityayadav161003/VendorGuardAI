@@ -26,6 +26,10 @@ class RiskScoringEngine:
         network_signals: List[Dict[str, Any]],
         external_evidence: List[Dict[str, Any]],
         has_document_evidence: bool = True,
+        unreadable_documents: int = 0,
+        total_documents: int = 0,
+        extracted_entity_count: int = 0,
+        data_source: str = "NO_EVIDENCE",
     ) -> Dict[str, Any]:
 
         # 1. Identity Score (Base: 92)
@@ -46,6 +50,13 @@ class RiskScoringEngine:
             document_score -= 25.0
         if not has_document_evidence:
             document_score = 55.0
+        if unreadable_documents:
+            # Unreadable content (scanned image without OCR etc.) is a verification
+            # failure, not a clean bill of health
+            document_score -= 30.0 * min(1.0, unreadable_documents / max(1, total_documents))
+        if data_source == "UPLOADED_DOCUMENTS" and extracted_entity_count == 0:
+            # Text was readable but no identifiers could be verified from it
+            document_score -= 25.0
         document_score = max(0.0, min(100.0, document_score))
 
         # 3. Financial Score (Base: 90)
@@ -107,6 +118,22 @@ class RiskScoringEngine:
         if tax_identity_mismatch:
             composite_score = min(composite_score, 55)
 
+        # Absence of verifiable content must never read as health:
+        # - every uploaded document unreadable  -> HIGH (nothing could be verified)
+        # - readable text but zero identifiers  -> MEDIUM (manual review required)
+        nothing_verifiable = (
+            data_source == "UPLOADED_DOCUMENTS" and extracted_entity_count == 0
+        )
+        all_unreadable = (
+            data_source == "UPLOADED_DOCUMENTS"
+            and total_documents > 0
+            and unreadable_documents >= total_documents
+        )
+        if all_unreadable:
+            composite_score = min(composite_score, 59)
+        elif nothing_verifiable:
+            composite_score = min(composite_score, 74)
+
         if composite_score >= 80:
             risk_level = "LOW"
         elif composite_score >= 60:
@@ -116,6 +143,42 @@ class RiskScoringEngine:
 
         # Synthesize Key Findings list
         key_findings = []
+        if all_unreadable:
+            key_findings.append(KeyFinding(
+                id="kf-0c",
+                severity="danger",
+                category="Documents",
+                message=(
+                    f"{unreadable_documents} uploaded document(s) could not be read "
+                    "(scanned image without OCR, encrypted or empty file). No content "
+                    "was verified — manual review or a readable copy is required."
+                ),
+                source_reference="Document Intake"
+            ))
+        elif nothing_verifiable:
+            key_findings.append(KeyFinding(
+                id="kf-0d",
+                severity="warning",
+                category="Documents",
+                message=(
+                    "Documents were readable but no identifiers (GSTIN, PAN, CIN, bank "
+                    "details) could be extracted or verified from them. The assessment "
+                    "is not evidence-backed."
+                ),
+                source_reference="Document Intake"
+            ))
+        elif unreadable_documents:
+            key_findings.append(KeyFinding(
+                id="kf-0e",
+                severity="warning",
+                category="Documents",
+                message=(
+                    f"{unreadable_documents} of {total_documents} uploaded document(s) "
+                    "could not be read and were excluded from verification."
+                ),
+                source_reference="Document Intake"
+            ))
+
         if supplier_profile.get("gstin_verified", True):
             key_findings.append(KeyFinding(
                 id="kf-1",

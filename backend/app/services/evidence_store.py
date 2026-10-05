@@ -170,6 +170,11 @@ class EvidenceStoreService:
                 fixture_evidence.append(item)
 
         document_count = len(docs)
+        unreadable_count = sum(
+            1 for d in docs
+            if d.status == "NEEDS_OCR" or (d.metadata_json or {}).get("needs_ocr")
+            or not (d.extracted_text or "").strip()
+        )
         if document_count > 0:
             data_source = "UPLOADED_DOCUMENTS"
         elif fixture_evidence:
@@ -182,6 +187,7 @@ class EvidenceStoreService:
             "passages": passages,
             "entities": entities,
             "document_count": document_count,
+            "unreadable_count": unreadable_count if document_count > 0 else 0,
             "data_source": data_source,
         }
 
