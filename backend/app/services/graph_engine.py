@@ -138,11 +138,3 @@ class GraphIntelligenceEngine:
         return signals
 
 graph_engine = GraphIntelligenceEngine()
-
-# NetworkX graph builder
-# Node construction
-# Edge construction
-# Shared director detection
-# Centrality metrics
-# UI formatting
-# Node coloring
