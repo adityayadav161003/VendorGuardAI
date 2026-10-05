@@ -1,8 +1,5 @@
 import io
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
+from tests.conftest import client  # authenticated as procurement_officer
 
 def test_ac1_supported_text_intake_success():
     """AC1: Supported files are processed and stored safely."""

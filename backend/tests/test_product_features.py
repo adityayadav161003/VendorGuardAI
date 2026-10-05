@@ -5,10 +5,7 @@ claim review persistence, alerts, report export and supplier PATCH.
 """
 import io
 
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
+from tests.conftest import client, reviewer_client  # role-authenticated clients
 
 
 def _create_supplier(name: str) -> str:
@@ -77,8 +74,11 @@ def test_claim_review_persists_and_surfaces_in_report():
     claim_id = report["claims"][0]["claim_id"]
     assert report["claims"][0]["reviewer_state"] == "PENDING"
 
-    res = client.post(f"/api/claims/{claim_id}/review", json={
-        "reviewer_id": "reviewer-777",
+    # Procurement users cannot record claim decisions (RBAC)
+    forbidden = client.post(f"/api/claims/{claim_id}/review", json={"action": "APPROVED"})
+    assert forbidden.status_code == 403
+
+    res = reviewer_client.post(f"/api/claims/{claim_id}/review", json={
         "action": "APPROVED",
         "comment": "Verified against registrar copy",
     })
@@ -91,7 +91,7 @@ def test_claim_review_persists_and_surfaces_in_report():
     assert replay["claims"][0]["reviewer_state"] == "APPROVED"
 
     # Invalid actions are rejected
-    bad = client.post(f"/api/claims/{claim_id}/review", json={"reviewer_id": "r", "action": "MAYBE"})
+    bad = reviewer_client.post(f"/api/claims/{claim_id}/review", json={"action": "MAYBE"})
     assert bad.status_code == 422
 
 
@@ -150,16 +150,18 @@ def test_alerts_derived_from_latest_analysis():
 def test_supplier_patch_updates_and_validates():
     sid = _create_supplier("Patch Me Pvt Ltd")
 
-    ok = client.patch(f"/api/suppliers/{sid}", json={"status": "VERIFIED", "website": "https://patchme.example.com"})
+    # procurement cannot change review status; reviewer can
+    assert client.patch(f"/api/suppliers/{sid}", json={"status": "VERIFIED"}).status_code == 403
+    ok = reviewer_client.patch(f"/api/suppliers/{sid}", json={"status": "VERIFIED", "website": "https://patchme.example.com"})
     assert ok.status_code == 200
     body = ok.json()
     assert body["status"] == "VERIFIED"
     assert body["website"] == "https://patchme.example.com"
 
-    invalid = client.patch(f"/api/suppliers/{sid}", json={"status": "NOT_A_STATUS"})
+    invalid = reviewer_client.patch(f"/api/suppliers/{sid}", json={"status": "NOT_A_STATUS"})
     assert invalid.status_code == 422
 
-    empty = client.patch(f"/api/suppliers/{sid}", json={})
+    empty = reviewer_client.patch(f"/api/suppliers/{sid}", json={})
     assert empty.status_code == 422
 
 
