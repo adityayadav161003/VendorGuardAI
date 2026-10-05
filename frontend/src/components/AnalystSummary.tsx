@@ -1,16 +1,40 @@
 import React, { useState } from 'react';
-import { Bot, CheckCircle, AlertCircle, ArrowRight, ShieldCheck, FileText } from 'lucide-react';
-import { AnalysisReport } from '../types';
+import { Bot, CheckCircle, AlertCircle, ArrowRight, ShieldCheck, FileText, ThumbsUp, ThumbsDown, XCircle } from 'lucide-react';
+import { AnalysisReport, ClaimVerification } from '../types';
+import { api } from '../services/api';
 
 interface AnalystSummaryProps {
   report: AnalysisReport;
+  onReviewRecorded?: () => void;
 }
 
-export const AnalystSummary: React.FC<AnalystSummaryProps> = ({ report }) => {
-  const [selectedClaim, setSelectedClaim] = useState<any | null>(null);
+const REVIEWER_BADGES: Record<string, string> = {
+  PENDING: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+  APPROVED: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  OVERRIDDEN: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  REJECTED: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+};
+
+export const AnalystSummary: React.FC<AnalystSummaryProps> = ({ report, onReviewRecorded }) => {
+  const [selectedClaim, setSelectedClaim] = useState<ClaimVerification | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
 
   const verifiedCount = report.claims.filter(c => c.status === 'SUPPORTED').length;
   const reviewCount = report.claims.filter(c => c.status !== 'SUPPORTED').length;
+
+  const recordReview = async (action: 'APPROVED' | 'OVERRIDDEN' | 'REJECTED') => {
+    if (!selectedClaim) return;
+    setReviewBusy(true);
+    try {
+      const result = await api.reviewClaim(selectedClaim.claim_id, action);
+      setSelectedClaim({ ...selectedClaim, reviewer_state: result.reviewer_state as ClaimVerification['reviewer_state'] });
+      onReviewRecorded?.();
+    } catch (err) {
+      console.error('Failed to record review:', err);
+    } finally {
+      setReviewBusy(false);
+    }
+  };
 
   return (
     <div className="bg-[#131b2e] border border-[#233252] rounded-xl p-5 shadow-lg">
@@ -74,11 +98,20 @@ export const AnalystSummary: React.FC<AnalystSummaryProps> = ({ report }) => {
                   </span>
                 </div>
               </div>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
-                claim.status === 'SUPPORTED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-              }`}>
-                {claim.status}
-              </span>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                  claim.status === 'SUPPORTED' ? 'bg-emerald-500/20 text-emerald-400'
+                    : claim.status === 'CONTRADICTED' ? 'bg-rose-500/20 text-rose-400'
+                    : 'bg-amber-500/20 text-amber-400'
+                }`}>
+                  {claim.status}
+                </span>
+                {claim.reviewer_state !== 'PENDING' && (
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${REVIEWER_BADGES[claim.reviewer_state]}`}>
+                    {claim.reviewer_state}
+                  </span>
+                )}
+              </div>
             </button>
           ))}
         </div>
@@ -97,6 +130,36 @@ export const AnalystSummary: React.FC<AnalystSummaryProps> = ({ report }) => {
             <p className="text-slate-300 bg-[#0d1424] p-2.5 rounded border border-[#1e293b] font-mono text-[11px]">
               "{selectedClaim.evidence_snippet}"
             </p>
+
+            {/* Human review actions (claim decisions stored separately from model output) */}
+            <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${REVIEWER_BADGES[selectedClaim.reviewer_state]}`}>
+                Reviewer: {selectedClaim.reviewer_state}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => recordReview('APPROVED')}
+                  disabled={reviewBusy}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 font-semibold disabled:opacity-50 transition-colors"
+                >
+                  <ThumbsUp className="w-3 h-3" /> Confirm
+                </button>
+                <button
+                  onClick={() => recordReview('OVERRIDDEN')}
+                  disabled={reviewBusy}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 font-semibold disabled:opacity-50 transition-colors"
+                >
+                  <AlertCircle className="w-3 h-3" /> Override
+                </button>
+                <button
+                  onClick={() => recordReview('REJECTED')}
+                  disabled={reviewBusy}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 font-semibold disabled:opacity-50 transition-colors"
+                >
+                  <XCircle className="w-3 h-3" /> Reject
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

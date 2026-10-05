@@ -35,6 +35,8 @@ export interface ClaimVerification {
   confidence_score: number;
   evidence_snippet?: string;
   source_doc_name?: string;
+  evidence_id?: string;
+  reviewer_state: 'PENDING' | 'APPROVED' | 'OVERRIDDEN' | 'REJECTED';
 }
 
 export interface AnalysisReport {
@@ -48,6 +50,16 @@ export interface AnalysisReport {
   key_findings: KeyFinding[];
   claims: ClaimVerification[];
   model_version: string;
+  generated_at: string;
+  data_source: 'UPLOADED_DOCUMENTS' | 'DEMO_FIXTURES' | 'NO_EVIDENCE';
+  document_count: number;
+}
+
+export interface SupplierAlert {
+  severity: 'warning' | 'danger' | 'info' | 'success';
+  category: string;
+  message: string;
+  source_reference?: string;
   generated_at: string;
 }
 
