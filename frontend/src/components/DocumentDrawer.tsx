@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 
 interface DocumentDrawerProps {
@@ -33,25 +33,26 @@ export const DocumentDrawer: React.FC<DocumentDrawerProps> = ({ supplierId, onUp
   };
 
   return (
-    <div className="bg-[#131b2e] border border-[#233252] rounded-xl p-5 shadow-lg">
-      <div className="flex items-center gap-2 mb-3">
-        <Upload className="w-4 h-4 text-blue-400" />
-        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
-          Upload Supplier Documents
-        </h3>
+    <div className="card-premium card-hover p-6">
+      <div className="flex items-center gap-3 mb-2">
+        <span className="w-8 h-8 rounded-lg bg-olive-700 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+          <Upload className="w-4 h-4 text-cream-50" />
+        </span>
+        <h3 className="font-display text-lg font-semibold text-espresso">Upload Supplier Documents</h3>
       </div>
-      <p className="text-xs text-slate-400 mb-4">
-        Supports PDF, images, and text filings. Extracts tax identifiers, dates, and bank details with page-level provenance.
+      <p className="text-xs text-brown-600 mb-5 max-w-2xl">
+        Supports PDF, images, and text filings. Extracts tax identifiers, dates, and bank details
+        with page-level provenance. Unreadable scans are flagged for manual review — never scored as healthy.
       </p>
 
-      <form onSubmit={handleUpload} className="space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <form onSubmit={handleUpload} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="text-[11px] font-semibold text-slate-400 block mb-1">Document Type</label>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brown-600 block mb-1.5">Document Type</label>
             <select
               value={docType}
               onChange={e => setDocType(e.target.value)}
-              className="w-full bg-[#0d1424] border border-[#233252] rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+              className="input-premium cursor-pointer"
             >
               <option value="GST">GST Registration Certificate</option>
               <option value="PAN">PAN Card</option>
@@ -63,11 +64,13 @@ export const DocumentDrawer: React.FC<DocumentDrawerProps> = ({ supplierId, onUp
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-slate-400 block mb-1">Select File</label>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brown-600 block mb-1.5">Select File</label>
             <input
               type="file"
               onChange={e => setFile(e.target.files ? e.target.files[0] : null)}
-              className="w-full bg-[#0d1424] border border-[#233252] rounded-lg px-3 py-1.5 text-xs text-slate-300 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer"
+              className="w-full rounded-xl bg-cream-50 border border-cream-300 px-3 py-2 text-xs text-brown-700
+                file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold
+                file:bg-olive-700 file:text-cream-50 hover:file:bg-olive-600 file:cursor-pointer file:transition-colors cursor-pointer"
             />
           </div>
         </div>
@@ -75,17 +78,21 @@ export const DocumentDrawer: React.FC<DocumentDrawerProps> = ({ supplierId, onUp
         <button
           type="submit"
           disabled={!file || uploading}
-          className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+          className="btn-primary w-full py-2.5"
         >
-          <Upload className="w-3.5 h-3.5" />
-          <span>{uploading ? 'Parsing & Extracting Fields...' : 'Process Document with Document AI'}</span>
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          <span>{uploading ? 'Parsing & Extracting Fields…' : 'Process Document with Document AI'}</span>
         </button>
 
         {message && (
-          <div className={`p-2.5 rounded text-xs flex items-center gap-2 ${
-            message.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+          <div className={`p-3 rounded-xl text-xs flex items-center gap-2.5 border animate-scale-in ${
+            message.type === 'success'
+              ? 'bg-olive-50 text-olive-800 border-olive-300'
+              : 'bg-[#F6E3DA] text-terracotta-deep border-terracotta/40'
           }`}>
-            {message.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+            {message.type === 'success'
+              ? <CheckCircle2 className="w-4 h-4 shrink-0" />
+              : <AlertCircle className="w-4 h-4 shrink-0" />}
             <span>{message.text}</span>
           </div>
         )}
@@ -93,5 +100,3 @@ export const DocumentDrawer: React.FC<DocumentDrawerProps> = ({ supplierId, onUp
     </div>
   );
 };
-
-// Document intake drawer

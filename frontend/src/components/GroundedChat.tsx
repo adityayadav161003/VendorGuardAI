@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, Send, ShieldCheck, FileText, CheckCircle2 } from 'lucide-react';
+import { Bot, Send, ShieldCheck, FileText, CheckCircle } from 'lucide-react';
 import { api } from '../services/api';
 import { ChatMessage } from '../types';
 
@@ -55,25 +55,25 @@ export const GroundedChat: React.FC<GroundedChatProps> = ({ supplierId, supplier
   };
 
   return (
-    <div className="bg-[#131b2e] border border-[#233252] rounded-xl p-5 shadow-lg flex flex-col h-[560px]">
+    <div className="card-premium p-6 flex flex-col h-[580px] animate-rise">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3.5 border-b border-[#233252] shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center">
-            <Bot className="w-4 h-4" />
-          </div>
+      <div className="flex items-center justify-between pb-4 border-b border-cream-300 shrink-0">
+        <div className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-lg bg-espresso flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+            <Bot className="w-4 h-4 text-brass-light" />
+          </span>
           <div>
-            <h3 className="text-sm font-bold text-white">Chat with Supplier Data</h3>
-            <p className="text-[11px] text-slate-400">Verifiable Answers with Source Citations</p>
+            <h3 className="font-display text-lg font-semibold text-espresso">Chat with Supplier Data</h3>
+            <p className="text-[11px] text-stonewarm">Verifiable Answers with Source Citations</p>
           </div>
         </div>
-        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+        <span className="badge-success">
           <ShieldCheck className="w-3 h-3" /> Grounding Active
         </span>
       </div>
 
-      {/* Suggested Quick Prompts */}
-      <div className="flex items-center gap-2 py-2 overflow-x-auto shrink-0">
+      {/* Quick prompts */}
+      <div className="flex items-center gap-2 py-3 overflow-x-auto shrink-0">
         {[
           "Are the bank details consistent?",
           "Check GST and PAN registration",
@@ -83,46 +83,45 @@ export const GroundedChat: React.FC<GroundedChatProps> = ({ supplierId, supplier
           <button
             key={idx}
             onClick={() => setInputQuery(prompt)}
-            className="text-[11px] px-2.5 py-1 rounded-md bg-[#0d1424] hover:bg-[#1e293b] border border-[#233252] text-slate-300 whitespace-nowrap transition-colors"
+            className="btn-quiet whitespace-nowrap"
           >
             {prompt}
           </button>
         ))}
       </div>
 
-      {/* Message History */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-4 py-3 pr-2">
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+            className={`flex flex-col animate-rise ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
           >
             <div
-              className={`max-w-[85%] rounded-xl p-3.5 text-xs sm:text-sm leading-relaxed ${
+              className={`max-w-[85%] rounded-2xl p-4 text-xs sm:text-sm leading-relaxed ${
                 msg.sender === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-none shadow-md shadow-blue-500/10'
-                  : 'bg-[#0d1424] border border-[#1e293b] text-slate-200 rounded-bl-none'
+                  ? 'bg-gradient-to-b from-olive-500 to-olive-700 text-cream-50 rounded-br-md shadow-[0_6px_16px_-6px_rgba(60,69,37,0.55)]'
+                  : 'bg-cream-100 border border-cream-300 text-espresso rounded-bl-md shadow-panel'
               }`}
             >
               <p>{msg.text}</p>
 
-              {/* Citations Box for Analyst Responses */}
               {msg.citations && msg.citations.length > 0 && (
-                <div className="mt-3 pt-2.5 border-t border-[#1e293b] space-y-1.5">
-                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    <span className="flex items-center gap-1">
-                      <FileText className="w-3 h-3 text-blue-400" /> Evidence Citations:
+                <div className="mt-3 pt-3 border-t border-cream-300 space-y-2">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-stonewarm uppercase tracking-[0.14em]">
+                    <span className="flex items-center gap-1.5">
+                      <FileText className="w-3 h-3 text-brass-deep" /> Evidence Citations
                     </span>
-                    <span className="text-emerald-400 font-mono">
+                    <span className="text-olive-700 font-mono normal-case tracking-normal">
                       {msg.claims_verified} claims verified
                     </span>
                   </div>
                   {msg.citations.map((cite, cIdx) => (
                     <div
                       key={cIdx}
-                      className="p-2 rounded bg-[#131b2e] border border-[#233252] text-[11px] font-mono text-slate-300"
+                      className="p-2.5 rounded-lg bg-linen border border-cream-300 text-[11px] font-mono text-brown-700"
                     >
-                      <span className="text-blue-400 font-bold">[{cite.doc_name} • p.{cite.page}]</span> {cite.snippet}
+                      <span className="text-olive-700 font-bold">[{cite.doc_name} • p.{cite.page}]</span> {cite.snippet}
                     </div>
                   ))}
                 </div>
@@ -131,33 +130,31 @@ export const GroundedChat: React.FC<GroundedChatProps> = ({ supplierId, supplier
           </div>
         ))}
         {loading && (
-          <div className="flex items-center gap-2 text-xs text-slate-400 animate-pulse">
-            <Bot className="w-4 h-4 text-blue-400" />
-            <span>Retrieving evidence and checking claims...</span>
+          <div className="flex items-center gap-2.5 text-xs text-brown-600 animate-pulse-soft">
+            <Bot className="w-4 h-4 text-brass-deep" />
+            <span>Retrieving evidence and checking claims…</span>
           </div>
         )}
       </div>
 
-      {/* Input Field */}
-      <form onSubmit={handleSend} className="pt-3 border-t border-[#233252] flex items-center gap-2 shrink-0">
+      {/* Composer */}
+      <form onSubmit={handleSend} className="pt-4 border-t border-cream-300 flex items-center gap-2.5 shrink-0">
         <input
           type="text"
           value={inputQuery}
           onChange={e => setInputQuery(e.target.value)}
-          placeholder="Ask a question about this supplier..."
-          className="flex-1 bg-[#0d1424] border border-[#233252] rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+          placeholder="Ask a question about this supplier…"
+          className="input-premium flex-1"
         />
         <button
           type="submit"
           disabled={loading || !inputQuery.trim()}
-          className="px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+          className="btn-primary !py-2.5"
         >
-          <Send className="w-3.5 h-3.5" />
+          <Send className="w-4 h-4" />
           <span>Ask</span>
         </button>
       </form>
     </div>
   );
 };
-
-// Grounded chat

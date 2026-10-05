@@ -9,7 +9,7 @@ import { SupplierCompare } from '../components/SupplierCompare';
 import { DocumentDrawer } from '../components/DocumentDrawer';
 import { api } from '../services/api';
 import { Supplier, AnalysisReport, GraphPayload, SupplierAlert } from '../types';
-import { Building2, RefreshCw, Plus, Download, FileJson, BellRing, X } from 'lucide-react';
+import { Building2, RefreshCw, Plus, Download, FileJson, BellRing, X, Loader2 } from 'lucide-react';
 
 interface DashboardProps {
   activeTab: string;
@@ -53,20 +53,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
   }, [selectedSupplierId]);
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-      {/* Supplier Selector Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#131b2e] border border-[#233252] p-4 rounded-xl">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-blue-600/20 text-blue-400">
-            <Building2 className="w-5 h-5" />
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      {/* ── Supplier selector bar ─────────────────────────── */}
+      <div className="card-premium animate-rise p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-olive-700 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_6px_14px_-6px_rgba(60,69,37,0.6)]">
+            <Building2 className="w-5 h-5 text-cream-100" />
           </div>
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400">Active Supplier Review</span>
-            <div className="flex items-center gap-2 mt-0.5">
+            <span className="section-label">Active Supplier Review</span>
+            <div className="mt-1.5">
               <select
                 value={selectedSupplierId}
                 onChange={e => setSelectedSupplierId(e.target.value)}
-                className="bg-[#0d1424] border border-[#233252] text-sm font-bold text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500"
+                className="input-premium !py-2 !px-3 text-sm font-semibold min-w-[260px] cursor-pointer"
               >
                 {suppliers.map(s => (
                   <option key={s.supplier_id} value={s.supplier_id}>
@@ -81,23 +81,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => { setShowCreateForm(!showCreateForm); setCreateError(null); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
+            className="btn-primary"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             <span>New Supplier</span>
           </button>
           <button
             onClick={() => api.exportReport(selectedSupplierId, 'html').catch(err => alert(err.message))}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] hover:bg-[#28384f] text-slate-300 text-xs font-semibold border border-[#334155] transition-colors"
+            className="btn-ghost"
           >
-            <Download className="w-3.5 h-3.5" />
+            <Download className="w-4 h-4" />
             <span>Export Report</span>
           </button>
           <button
             onClick={() => api.exportReport(selectedSupplierId, 'json').catch(err => alert(err.message))}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] hover:bg-[#28384f] text-slate-300 text-xs font-semibold border border-[#334155] transition-colors"
+            className="btn-ghost"
           >
-            <FileJson className="w-3.5 h-3.5" />
+            <FileJson className="w-4 h-4" />
             <span>JSON</span>
           </button>
           <button
@@ -110,37 +110,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
               }
               await loadData(selectedSupplierId);
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] hover:bg-[#28384f] text-slate-300 text-xs font-semibold border border-[#334155] transition-colors"
+            className="btn-brass"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span>Re-run Analysis</span>
           </button>
         </div>
       </div>
 
+      {/* ── New supplier form ─────────────────────────────── */}
       {showCreateForm && (
-        <div className="bg-[#131b2e] border border-[#233252] p-4 rounded-xl space-y-3">
+        <div className="card-premium p-5 space-y-4 animate-scale-in">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Onboard New Supplier</span>
-            <button onClick={() => setShowCreateForm(false)} className="text-slate-400 hover:text-slate-200">
+            <span className="section-label">Onboard New Supplier</span>
+            <button onClick={() => setShowCreateForm(false)} className="p-1 text-stonewarm hover:text-espresso transition-colors rounded-lg">
               <X className="w-4 h-4" />
             </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <input
               value={newSupplierName}
               onChange={e => setNewSupplierName(e.target.value)}
               placeholder="Legal company name *"
-              className="bg-[#0d1424] border border-[#233252] text-sm text-white rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 sm:col-span-2"
+              className="input-premium sm:col-span-2"
             />
             <input
               value={newSupplierIndustry}
               onChange={e => setNewSupplierIndustry(e.target.value)}
               placeholder="Industry"
-              className="bg-[#0d1424] border border-[#233252] text-sm text-white rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+              className="input-premium"
             />
           </div>
-          {createError && <p className="text-xs text-rose-400">{createError}</p>}
+          {createError && <p className="text-xs text-terracotta-deep">{createError}</p>}
           <button
             onClick={async () => {
               if (!newSupplierName.trim()) { setCreateError('Supplier name is required'); return; }
@@ -163,26 +164,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
               }
             }}
             disabled={creating}
-            className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold disabled:opacity-50 transition-colors"
+            className="btn-primary"
           >
+            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             {creating ? 'Creating...' : 'Create Supplier Profile'}
           </button>
         </div>
       )}
 
+      {/* ── Alerts ────────────────────────────────────────── */}
       {!loading && alerts.length > 0 && (
-        <div className="bg-[#131b2e] border border-amber-500/30 p-3.5 rounded-xl">
-          <div className="flex items-center gap-2 mb-2">
-            <BellRing className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-300">Active Alerts</span>
+        <div className="card-premium border-brass/50 animate-rise p-4">
+          <div className="flex items-center gap-2.5 mb-3">
+            <span className="w-8 h-8 rounded-lg bg-[#F3E7C9] border border-brass/40 flex items-center justify-center">
+              <BellRing className="w-4 h-4 text-gold-deep" />
+            </span>
+            <span className="section-label !text-gold-deep">Active Alerts</span>
           </div>
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {alerts.map((a, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-xs">
-                <span className={`mt-0.5 shrink-0 w-1.5 h-1.5 rounded-full ${a.severity === 'danger' ? 'bg-rose-500' : 'bg-amber-500'}`} />
-                <span className={a.severity === 'danger' ? 'text-rose-300' : 'text-amber-200'}>
-                  <b>{a.category}:</b> {a.message}
-                  {a.source_reference && <span className="text-slate-500"> — {a.source_reference}</span>}
+              <li
+                key={idx}
+                className="flex items-start gap-2.5 text-[13px] p-2.5 rounded-xl border animate-fade"
+                style={{
+                  animationDelay: `${idx * 0.06}s`,
+                  borderColor: a.severity === 'danger' ? 'rgba(176,86,58,0.35)' : 'rgba(185,151,91,0.4)',
+                  background: a.severity === 'danger' ? 'rgba(176,86,58,0.06)' : 'rgba(185,151,91,0.08)',
+                }}
+              >
+                <span className={`mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full ${a.severity === 'danger' ? 'bg-terracotta' : 'bg-gold'}`} />
+                <span className={a.severity === 'danger' ? 'text-terracotta-deep' : 'text-gold-deep'}>
+                  <b className="font-semibold">{a.category}:</b> {a.message}
+                  {a.source_reference && <span className="text-stonewarm"> — {a.source_reference}</span>}
                 </span>
               </li>
             ))}
@@ -190,73 +203,84 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
         </div>
       )}
 
+      {/* ── Loading state ─────────────────────────────────── */}
       {loading && (
-        <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400 text-sm">
-          <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
-          <span>Evaluating multi-vector risk and verifying evidence...</span>
+        <div className="card-premium py-24 flex flex-col items-center justify-center gap-4 text-brown-600 text-sm animate-fade">
+          <RefreshCw className="w-6 h-6 animate-spin text-olive-600" />
+          <span className="font-display italic text-lg text-espresso">Evaluating multi-vector risk and verifying evidence…</span>
+          <span className="text-xs text-stonewarm">Cross-checking registries, consistency rules and network signals</span>
         </div>
       )}
 
+      {/* ── Tab content ───────────────────────────────────── */}
       {!loading && report && graphData && (
         <>
           {activeTab === 'dashboard' && (
-            <div className="space-y-6">
-              {/* Primary Scorecard matching poster sample output */}
+            <div key="dashboard" className="space-y-6 animate-fade">
               <ScoreCard report={report} />
 
-              {/* 2-Column Section: Risk Breakdown (6 vectors) + Key Findings */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <RiskRadar breakdown={report.risk_breakdown} />
-                <FindingsList findings={report.key_findings} />
+                <div className="animate-rise" style={{ animationDelay: '0.08s' }}>
+                  <RiskRadar breakdown={report.risk_breakdown} />
+                </div>
+                <div className="animate-rise" style={{ animationDelay: '0.16s' }}>
+                  <FindingsList findings={report.key_findings} />
+                </div>
               </div>
 
-              {/* Evidence basis banner */}
-              <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                <span className="font-bold uppercase tracking-wider">Evidence basis:</span>
-                <span className={`px-2 py-0.5 rounded font-semibold ${
-                  report.data_source === 'UPLOADED_DOCUMENTS' ? 'bg-emerald-500/20 text-emerald-400'
-                    : report.data_source === 'DEMO_FIXTURES' ? 'bg-blue-500/20 text-blue-400'
-                    : 'bg-rose-500/20 text-rose-400'
+              {/* Evidence basis */}
+              <div className="flex items-center gap-2.5 text-xs animate-rise" style={{ animationDelay: '0.22s' }}>
+                <span className="section-label">Evidence basis</span>
+                <span className={`badge ${
+                  report.data_source === 'UPLOADED_DOCUMENTS' ? 'badge-success'
+                    : report.data_source === 'DEMO_FIXTURES' ? 'badge-info'
+                    : 'badge-danger'
                 }`}>
                   {report.data_source.replace('_', ' ')}
                 </span>
-                <span>· {report.document_count} uploaded document(s) on file</span>
+                <span className="text-stonewarm">· {report.document_count} uploaded document(s) on file</span>
               </div>
 
-              {/* AI Analyst Grounded Summary with Claim Verification */}
-              <AnalystSummary report={report} onReviewRecorded={() => loadData(selectedSupplierId)} />
+              <div className="animate-rise" style={{ animationDelay: '0.26s' }}>
+                <AnalystSummary report={report} onReviewRecorded={() => loadData(selectedSupplierId)} />
+              </div>
 
-              {/* Document Upload Drawer */}
-              <DocumentDrawer
-                supplierId={selectedSupplierId}
-                onUploadSuccess={() => loadData(selectedSupplierId)}
-              />
+              <div className="animate-rise" style={{ animationDelay: '0.32s' }}>
+                <DocumentDrawer
+                  supplierId={selectedSupplierId}
+                  onUploadSuccess={() => loadData(selectedSupplierId)}
+                />
+              </div>
             </div>
           )}
 
           {activeTab === 'graph' && (
-            <GraphViewer graphData={graphData} />
+            <div key="graph" className="animate-fade">
+              <GraphViewer graphData={graphData} />
+            </div>
           )}
 
           {activeTab === 'chat' && (
-            <GroundedChat
-              supplierId={selectedSupplierId}
-              supplierName={report.supplier_name}
-            />
+            <div key="chat" className="animate-fade">
+              <GroundedChat
+                supplierId={selectedSupplierId}
+                supplierName={report.supplier_name}
+              />
+            </div>
           )}
 
           {activeTab === 'compare' && (
-            <SupplierCompare
-              suppliers={suppliers}
-              onSelectSupplier={(sid) => {
-                setSelectedSupplierId(sid);
-              }}
-            />
+            <div key="compare" className="animate-fade">
+              <SupplierCompare
+                suppliers={suppliers}
+                onSelectSupplier={(sid) => {
+                  setSelectedSupplierId(sid);
+                }}
+              />
+            </div>
           )}
         </>
       )}
     </main>
   );
 };
-
-// Dashboard page
