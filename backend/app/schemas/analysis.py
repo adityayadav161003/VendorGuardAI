@@ -25,6 +25,13 @@ class KeyFinding(BaseModel):
     category: str  # Identity, Compliance, Financial, Network, Reputation
     source_reference: Optional[str] = None
     page_number: Optional[int] = None
+    conflict_type: Optional[str] = None
+    source_a: Optional[str] = None
+    source_b: Optional[str] = None
+    source_a_details: Optional[Dict[str, Any]] = None
+    source_b_details: Optional[Dict[str, Any]] = None
+    similarity_score: Optional[float] = None
+    status: Optional[str] = "OPEN"
 
 class ClaimVerification(BaseModel):
     claim_id: str

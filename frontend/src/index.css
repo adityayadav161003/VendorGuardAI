@@ -156,3 +156,41 @@ body::before {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Print-ready stylesheet */
+@media print {
+  header, footer, nav, button, .no-print {
+    display: none !important;
+  }
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+  body::before {
+    display: none !important;
+  }
+  .card-premium {
+    box-shadow: none !important;
+    border: 1px solid #d9ceb2 !important;
+    background: #ffffff !important;
+    break-inside: avoid;
+  }
+}
+
+@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slide-left {
+  animation: slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-down {
+  animation: slideDown 0.2s ease-out;
+}

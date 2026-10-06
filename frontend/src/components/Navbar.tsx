@@ -12,21 +12,25 @@ const ROLE_LABELS: Record<string, string> = {
 interface NavbarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  onOpenShortcuts?: () => void;
 }
 
 const TABS = [
-  { id: 'dashboard', label: 'Scorecard' },
-  { id: 'graph', label: 'Graph Explorer' },
+  { id: 'dashboard', label: 'Overview' },
+  { id: 'conflicts_docs', label: 'Documents & Pipeline' },
+  { id: 'graph', label: 'Network Graph' },
   { id: 'chat', label: 'AI Analyst' },
-  { id: 'compare', label: 'Compare' },
+  { id: 'compare', label: 'Tender Compare' },
+  { id: 'monitoring', label: 'Watchlist & Feed' },
+  { id: 'portfolio', label: 'Portfolio Intel' },
 ];
 
-export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
+export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenShortcuts }) => {
   const { user, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 bg-espresso/95 backdrop-blur-md border-b border-brown-800/80 shadow-[0_4px_20px_-8px_rgba(33,26,18,0.7)]">
-      <div className="max-w-7xl mx-auto px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col xl:flex-row items-center justify-between gap-3">
         {/* Brand */}
         <div className="flex items-center gap-3">
           <Crest className="w-10 h-10" />
@@ -42,34 +46,56 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
         </div>
 
         {/* Tabs + session */}
-        <div className="flex items-center gap-3">
-          <nav className="flex items-center gap-1 bg-espresso-light/80 border border-brown-800 p-1 rounded-xl">
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={activeTab === tab.id ? 'tab-active' : 'tab-idle'}
-              >
-                {tab.label}
-              </button>
-            ))}
+        <div className="flex items-center gap-3 flex-wrap justify-center">
+          <nav className="flex items-center gap-1 bg-espresso-light/80 border border-brown-800 p-1 rounded-xl overflow-x-auto max-w-full">
+            {TABS.map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${
+                    isActive
+                      ? 'text-cream-50 bg-olive-700/80 shadow-[0_2px_8px_rgba(60,69,37,0.5)] font-semibold'
+                      : 'text-cream-300/70 hover:text-cream-100 hover:bg-espresso-light'
+                  }`}
+                >
+                  {tab.label}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-brass-light rounded-full" />
+                  )}
+                </button>
+              );
+            })}
           </nav>
 
-          {user && (
-            <div className="flex items-center gap-2.5 bg-espresso-light/80 border border-brown-800 rounded-xl pl-3 pr-1.5 py-1.5">
-              <div className="text-right leading-tight">
-                <div className="text-[11.5px] font-semibold text-cream-100">{user.name}</div>
-                <div className="text-[10px] text-brass-light tracking-wide">{ROLE_LABELS[user.role] || user.role}</div>
-              </div>
+          <div className="flex items-center gap-2">
+            {onOpenShortcuts && (
               <button
-                onClick={logout}
-                title="Sign out"
-                className="p-1.5 rounded-lg text-cream-300/70 hover:text-cream-50 hover:bg-terracotta/30 transition-colors duration-200"
+                onClick={onOpenShortcuts}
+                title="Keyboard Shortcuts (?)"
+                className="px-2 py-1.5 rounded-lg bg-espresso-light/80 border border-brown-800 text-cream-300/70 hover:text-cream-100 text-xs font-mono transition-colors"
               >
-                <LogOut className="w-4 h-4" />
+                ?
               </button>
-            </div>
-          )}
+            )}
+
+            {user && (
+              <div className="flex items-center gap-2.5 bg-espresso-light/80 border border-brown-800 rounded-xl pl-3 pr-1.5 py-1.5">
+                <div className="text-right leading-tight">
+                  <div className="text-[11.5px] font-semibold text-cream-100">{user.name}</div>
+                  <div className="text-[10px] text-brass-light tracking-wide">{ROLE_LABELS[user.role] || user.role}</div>
+                </div>
+                <button
+                  onClick={logout}
+                  title="Sign out"
+                  className="p-1.5 rounded-lg text-cream-300/70 hover:text-cream-50 hover:bg-terracotta/30 transition-colors duration-200 cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

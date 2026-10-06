@@ -173,3 +173,32 @@ async def upload_document(
     db.commit()
 
     return doc_record
+
+
+@router.get("/{supplier_id}/extracted-entities")
+def get_supplier_extracted_entities(
+    supplier_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Returns all extracted entities across documents for the given supplier with confidence and provenance."""
+    docs = db.query(Document).filter(Document.supplier_id == supplier_id).all()
+    doc_map = {d.document_id: d.file_name for d in docs}
+    doc_ids = list(doc_map.keys())
+    if not doc_ids:
+        return []
+    entities = db.query(ExtractedEntity).filter(ExtractedEntity.document_id.in_(doc_ids)).all()
+    return [
+        {
+            "id": e.entity_id,
+            "document_id": e.document_id,
+            "document_name": doc_map.get(e.document_id, "Document"),
+            "page_number": e.page_number,
+            "entity_type": e.entity_type,
+            "entity_value": e.entity_value,
+            "confidence": e.confidence_score,
+            "snippet": e.snippet,
+            "bounding_box": e.bounding_box,
+        }
+        for e in entities
+    ]

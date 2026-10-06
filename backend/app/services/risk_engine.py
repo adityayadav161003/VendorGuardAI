@@ -507,6 +507,13 @@ class RiskScoringEngine:
                     category="Identity",
                     message=f.get("message", "PAN embedded in GSTIN differs from supplied PAN."),
                     source_reference=f.get("source_a", "GST / PAN Records"),
+                    conflict_type=ctype,
+                    source_a=f.get("source_a"),
+                    source_b=f.get("source_b"),
+                    source_a_details=f.get("source_a_details"),
+                    source_b_details=f.get("source_b_details"),
+                    similarity_score=f.get("similarity_score"),
+                    status="OPEN",
                 ))
             elif ctype == "BANK_NAME_MISMATCH":
                 key_findings.append(KeyFinding(
@@ -515,6 +522,13 @@ class RiskScoringEngine:
                     category="Financial",
                     message=f.get("message", "Bank account holder name mismatch against registered name."),
                     source_reference=f.get("source_a", "Bank Records"),
+                    conflict_type=ctype,
+                    source_a=f.get("source_a"),
+                    source_b=f.get("source_b"),
+                    source_a_details=f.get("source_a_details"),
+                    source_b_details=f.get("source_b_details"),
+                    similarity_score=f.get("similarity_score"),
+                    status="OPEN",
                 ))
             elif ctype == "PRICE_ANOMALY":
                 key_findings.append(KeyFinding(
@@ -523,6 +537,13 @@ class RiskScoringEngine:
                     category="Financial",
                     message=f.get("message", "Price anomaly detected across invoices."),
                     source_reference=f.get("source_a", "Invoice cross-check"),
+                    conflict_type=ctype,
+                    source_a=f.get("source_a"),
+                    source_b=f.get("source_b"),
+                    source_a_details=f.get("source_a_details"),
+                    source_b_details=f.get("source_b_details"),
+                    similarity_score=f.get("similarity_score"),
+                    status="OPEN",
                 ))
             elif ctype == "PRICE_CONSISTENT":
                 key_findings.append(KeyFinding(
@@ -539,6 +560,13 @@ class RiskScoringEngine:
                     category="Documents",
                     message=f.get("message", "Conflicting field values across documents."),
                     source_reference=f.get("source_a", "Document cross-check"),
+                    conflict_type=ctype,
+                    source_a=f.get("source_a"),
+                    source_b=f.get("source_b"),
+                    source_a_details=f.get("source_a_details"),
+                    source_b_details=f.get("source_b_details"),
+                    similarity_score=f.get("similarity_score"),
+                    status="OPEN",
                 ))
             elif f.get("status") == "EXPIRING_SOON":
                 key_findings.append(KeyFinding(

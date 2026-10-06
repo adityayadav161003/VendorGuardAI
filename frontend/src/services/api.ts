@@ -1,4 +1,20 @@
-import { Supplier, AnalysisReport, GraphPayload, SupplierAlert, AuthUser, TenderResult, TenderHistoryItem, AnalyticsOverview, PipelineStage } from '../types';
+import {
+  Supplier,
+  AnalysisReport,
+  GraphPayload,
+  SupplierAlert,
+  AuthUser,
+  TenderResult,
+  TenderHistoryItem,
+  AnalyticsOverview,
+  PipelineStage,
+  ExtractedEntityItem,
+  PipelineJob,
+  PortalInvite,
+  PortalViewData,
+  TimelineEvent,
+  EvalRunSummary,
+} from '../types';
 
 const API_BASE = '/api';
 
@@ -243,6 +259,134 @@ export const api = {
       body: JSON.stringify({ supplier_id: supplierId, question })
     }));
     if (!res.ok) throw new Error(await errorDetail(res, 'Failed to send question to AI analyst'));
+    return res.json();
+  },
+
+  // ---------------- compare suppliers ----------------
+  async compareSuppliers(supplierIds: string[]): Promise<{ comparisons: AnalysisReport[] }> {
+    const res = await handle(await fetch(`${API_BASE}/suppliers/compare`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ supplier_ids: supplierIds })
+    }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Failed to compare suppliers'));
+    return res.json();
+  },
+
+  // ---------------- extracted entities ----------------
+  async getExtractedEntities(supplierId: string): Promise<ExtractedEntityItem[]> {
+    const res = await handle(await fetch(`${API_BASE}/suppliers/${supplierId}/extracted-entities`, {
+      headers: authHeaders()
+    }));
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  // ---------------- async pipeline jobs ----------------
+  async startPipelineJob(supplierId: string): Promise<PipelineJob> {
+    const res = await handle(await fetch(`${API_BASE}/pipeline/start/${supplierId}`, {
+      method: 'POST',
+      headers: authHeaders()
+    }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Failed to start pipeline job'));
+    return res.json();
+  },
+
+  async getPipelineJob(jobId: string): Promise<PipelineJob> {
+    const res = await handle(await fetch(`${API_BASE}/pipeline/jobs/${jobId}`, {
+      headers: authHeaders()
+    }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Failed to fetch pipeline status'));
+    return res.json();
+  },
+
+  async retryPipelineJob(jobId: string): Promise<PipelineJob> {
+    const res = await handle(await fetch(`${API_BASE}/pipeline/jobs/${jobId}/retry`, {
+      method: 'POST',
+      headers: authHeaders()
+    }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Failed to retry pipeline job'));
+    return res.json();
+  },
+
+  // ---------------- supplier self-service portal ----------------
+  async createPortalInvite(supplierId: string, payload: { recipient_email?: string; required_documents?: string[]; expires_in_days?: number }): Promise<PortalInvite> {
+    const res = await handle(await fetch(`${API_BASE}/portal/invites`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ supplier_id: supplierId, ...payload })
+    }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Failed to create portal invite'));
+    return res.json();
+  },
+
+  async getPortalInvites(supplierId: string): Promise<PortalInvite[]> {
+    const res = await handle(await fetch(`${API_BASE}/portal/invites/${supplierId}`, {
+      headers: authHeaders()
+    }));
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async getPortalView(token: string): Promise<PortalViewData> {
+    const res = await fetch(`${API_BASE}/portal/view/${token}`);
+    if (!res.ok) throw new Error(await errorDetail(res, 'Invalid or expired portal link'));
+    return res.json();
+  },
+
+  async uploadPortalDocument(token: string, docType: string, file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('document_type', docType);
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE}/portal/upload/${token}`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) throw new Error(await errorDetail(res, 'Portal upload failed'));
+    return res.json();
+  },
+
+  // ---------------- monitoring & timeline ----------------
+  async getMonitoringAlerts(supplierId: string): Promise<any> {
+    const res = await handle(await fetch(`${API_BASE}/monitoring/alerts/${supplierId}`, {
+      headers: authHeaders()
+    }));
+    if (!res.ok) return { alerts: [] };
+    return res.json();
+  },
+
+  async getSupplierTimeline(supplierId: string): Promise<TimelineEvent[]> {
+    const res = await handle(await fetch(`${API_BASE}/monitoring/timeline/${supplierId}`, {
+      headers: authHeaders()
+    }));
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async triggerSupplierRecheck(supplierId: string): Promise<any> {
+    const res = await handle(await fetch(`${API_BASE}/monitoring/recheck/${supplierId}`, {
+      method: 'POST',
+      headers: authHeaders()
+    }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Re-check failed'));
+    return res.json();
+  },
+
+  // ---------------- evaluation benchmark ----------------
+  async runEvalBenchmark(): Promise<EvalRunSummary> {
+    const res = await handle(await fetch(`${API_BASE}/eval/run`, {
+      method: 'POST',
+      headers: authHeaders()
+    }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Benchmark run failed'));
+    return res.json();
+  },
+
+  async getEvalRuns(): Promise<any[]> {
+    const res = await handle(await fetch(`${API_BASE}/eval/runs`, {
+      headers: authHeaders()
+    }));
+    if (!res.ok) return [];
     return res.json();
   }
 };

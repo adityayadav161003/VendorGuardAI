@@ -27,6 +27,14 @@ export interface RiskBreakdown {
   vectors?: Record<string, RiskVectorDetail>;
 }
 
+export interface ConflictSourceDetails {
+  document_id?: string;
+  document_name?: string;
+  page?: number;
+  snippet?: string;
+  value?: string;
+}
+
 export interface KeyFinding {
   id: string;
   severity: 'success' | 'info' | 'warning' | 'danger';
@@ -34,6 +42,13 @@ export interface KeyFinding {
   category: string;
   source_reference?: string;
   page_number?: number;
+  conflict_type?: string;
+  source_a?: string;
+  source_b?: string;
+  source_a_details?: ConflictSourceDetails;
+  source_b_details?: ConflictSourceDetails;
+  similarity_score?: number;
+  status?: 'OPEN' | 'REVIEWED' | 'WAIVED';
 }
 
 export interface ClaimVerification {
@@ -219,4 +234,79 @@ export interface PipelineStage {
   message: string;
   progress: number;
   report?: AnalysisReport;
+}
+
+export interface ExtractedEntityItem {
+  id: string;
+  document_id: string;
+  document_name?: string;
+  page_number: number;
+  entity_type: string;
+  entity_value: string;
+  confidence: number;
+  snippet?: string;
+  bounding_box?: Record<string, any>;
+}
+
+export interface PipelineJob {
+  job_id: string;
+  supplier_id: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'RETRYING';
+  current_stage: string;
+  progress_percent: number;
+  stage_timings: Record<string, number>;
+  error_message?: string;
+  retry_count: number;
+  created_at: string;
+  completed_at?: string;
+}
+
+export interface PortalInvite {
+  invite_id: string;
+  supplier_id: string;
+  supplier_name: string;
+  invite_token: string;
+  invite_url?: string;
+  recipient_email?: string;
+  required_documents: string[];
+  expires_at: string;
+  status: 'ACTIVE' | 'USED' | 'EXPIRED' | 'REVOKED';
+}
+
+export interface PortalViewData {
+  supplier_name: string;
+  required_documents: string[];
+  uploaded_documents: Array<{
+    document_id: string;
+    original_filename: string;
+    document_type: string;
+    uploaded_at: string;
+    page_count?: number;
+  }>;
+  expires_at: string;
+}
+
+export interface TimelineEvent {
+  event_id: string;
+  supplier_id: string;
+  event_type: string;
+  title: string;
+  details?: string;
+  metadata_json?: Record<string, any>;
+  actor_email?: string;
+  timestamp: string;
+}
+
+export interface EvalRunSummary {
+  run_id: string;
+  executed_at: string;
+  metrics: {
+    field_extraction: { precision: number; recall: number; f1_score: number };
+    conflict_detection: { precision: number; recall: number; f1_score: number };
+    claim_verification: {
+      per_class: Record<string, { precision: number; recall: number; f1_score: number }>;
+      confusion_matrix: Record<string, Record<string, number>>;
+    };
+  };
+  disclaimer: string;
 }

@@ -1,15 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { ScoreCard } from '../components/ScoreCard';
 import { RiskRadar } from '../components/RiskRadar';
 import { FindingsList } from '../components/FindingsList';
 import { AnalystSummary } from '../components/AnalystSummary';
+import { DocumentManager } from '../components/DocumentManager';
 import { GraphViewer } from '../components/GraphViewer';
 import { GroundedChat } from '../components/GroundedChat';
 import { SupplierCompare } from '../components/SupplierCompare';
-import { DocumentDrawer } from '../components/DocumentDrawer';
+import { MonitoringWatchlist } from '../components/MonitoringWatchlist';
+import { CommandCenter } from '../components/CommandCenter';
+import { GlobalStatusBar } from '../components/GlobalStatusBar';
+import { SupplierActionBar } from '../components/SupplierActionBar';
+import { VectorDetailDrawer } from '../components/VectorDetailDrawer';
+import { PortalInviteModal } from '../components/PortalInviteModal';
+import { KeyboardShortcutsModal } from '../components/KeyboardShortcutsModal';
 import { api } from '../services/api';
 import { Supplier, AnalysisReport, GraphPayload, SupplierAlert } from '../types';
-import { Building2, RefreshCw, Plus, Download, FileJson, BellRing, X, Loader2 } from 'lucide-react';
+import { Plus, X, Loader2, RefreshCw, FileText, CheckCircle2 } from 'lucide-react';
 
 interface DashboardProps {
   activeTab: string;
@@ -22,20 +29,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
   const [graphData, setGraphData] = useState<GraphPayload | null>(null);
   const [alerts, setAlerts] = useState<SupplierAlert[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Modals & Drawers state
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showPortalModal, setShowPortalModal] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+
+  // Vector Audit Drawer
+  const [auditVectorKey, setAuditVectorKey] = useState<string | null>(null);
+
+  // Onboard form
   const [newSupplierName, setNewSupplierName] = useState('');
   const [newSupplierIndustry, setNewSupplierIndustry] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const loadData = async (supplierId: string) => {
+  const loadData = useCallback(async (supplierId: string) => {
     setLoading(true);
     try {
       const [sups, rep, graph, alrts] = await Promise.all([
         api.getSuppliers(),
         api.getAnalysisReport(supplierId),
         api.getRelationshipGraph(supplierId),
-        api.getAlerts(supplierId).catch(() => [])
+        api.getAlerts(supplierId).catch(() => []),
       ]);
       setSuppliers(sups);
       setReport(rep);
@@ -46,241 +62,285 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData(selectedSupplierId);
-  }, [selectedSupplierId]);
+  }, [selectedSupplierId, loadData]);
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if focus is in an input or textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        return;
+      }
+
+      if (e.key === '/') {
+        e.preventDefault();
+        const switcherBtn = document.getElementById('supplier-switcher-btn');
+        switcherBtn?.click();
+      } else if (e.key === '?') {
+        e.preventDefault();
+        setShowShortcutsModal(prev => !prev);
+      } else if (e.key === 'r') {
+        e.preventDefault();
+        loadData(selectedSupplierId);
+      } else if (e.key === 'e') {
+        e.preventDefault();
+        api.exportReport(selectedSupplierId, 'html').catch(err => alert(err.message));
+      } else if (e.key === 'j') {
+        e.preventDefault();
+        const idx = suppliers.findIndex(s => s.supplier_id === selectedSupplierId);
+        if (idx !== -1 && idx < suppliers.length - 1) {
+          setSelectedSupplierId(suppliers[idx + 1].supplier_id);
+        }
+      } else if (e.key === 'k') {
+        e.preventDefault();
+        const idx = suppliers.findIndex(s => s.supplier_id === selectedSupplierId);
+        if (idx > 0) {
+          setSelectedSupplierId(suppliers[idx - 1].supplier_id);
+        }
+      } else if (e.key === 'Escape') {
+        setShowShortcutsModal(false);
+        setShowPortalModal(false);
+        setShowCreateForm(false);
+        setAuditVectorKey(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [suppliers, selectedSupplierId, loadData]);
+
+  // Get active vector detail for audit drawer
+  const activeVectorDetail = report && auditVectorKey
+    ? (report.risk_breakdown.vectors ? report.risk_breakdown.vectors[auditVectorKey] : null)
+    : null;
+
+  const activeVectorScore = report && auditVectorKey
+    ? (report.risk_breakdown as any)[auditVectorKey] ?? report.risk_score
+    : null;
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      {/* ── Supplier selector bar ─────────────────────────── */}
-      <div className="card-premium animate-rise p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-olive-700 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_6px_14px_-6px_rgba(60,69,37,0.6)]">
-            <Building2 className="w-5 h-5 text-cream-100" />
-          </div>
-          <div>
-            <span className="section-label">Active Supplier Review</span>
-            <div className="mt-1.5">
-              <select
-                value={selectedSupplierId}
-                onChange={e => setSelectedSupplierId(e.target.value)}
-                className="input-premium !py-2 !px-3 text-sm font-semibold min-w-[260px] cursor-pointer"
+    <div className="space-y-6">
+      {/* ── Slim Global Status Bar (replacing repeated banners) ── */}
+      <GlobalStatusBar
+        alerts={alerts}
+        dataSource={report?.data_source}
+        isEvidenceGrounded={report?.is_evidence_grounded}
+      />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6 pb-12">
+        {/* ── Sticky Action Bar with Searchable Switcher ───── */}
+        <SupplierActionBar
+          suppliers={suppliers}
+          selectedSupplierId={selectedSupplierId}
+          onSelectSupplier={setSelectedSupplierId}
+          report={report}
+          loading={loading}
+          onNewSupplierClick={() => { setShowCreateForm(prev => !prev); setCreateError(null); }}
+          onReanalyzeClick={() => loadData(selectedSupplierId)}
+          onExport={format => api.exportReport(selectedSupplierId, format).catch(err => alert(err.message))}
+          onInvitePortalClick={() => setShowPortalModal(true)}
+        />
+
+        {/* ── New Supplier Modal/Form ──────────────────────── */}
+        {showCreateForm && (
+          <div className="card-premium p-5 space-y-4 animate-scale-in border-brass/50 shadow-card">
+            <div className="flex items-center justify-between">
+              <span className="section-label">Onboard New Supplier</span>
+              <button
+                onClick={() => setShowCreateForm(false)}
+                className="p-1 text-stonewarm hover:text-espresso transition-colors rounded-lg"
               >
-                {suppliers.map(s => (
-                  <option key={s.supplier_id} value={s.supplier_id}>
-                    {s.name} ({s.business_type})
-                  </option>
-                ))}
-              </select>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input
+                value={newSupplierName}
+                onChange={e => setNewSupplierName(e.target.value)}
+                placeholder="Legal company name *"
+                className="input-premium sm:col-span-2 text-xs"
+              />
+              <input
+                value={newSupplierIndustry}
+                onChange={e => setNewSupplierIndustry(e.target.value)}
+                placeholder="Industry (e.g. Packaging, Steel)"
+                className="input-premium text-xs"
+              />
+            </div>
+            {createError && <p className="text-xs text-terracotta-deep font-semibold">{createError}</p>}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowCreateForm(false)} className="btn-ghost !text-xs">
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!newSupplierName.trim()) { setCreateError('Supplier name is required'); return; }
+                  setCreating(true);
+                  setCreateError(null);
+                  try {
+                    const created = await api.createSupplier({
+                      name: newSupplierName.trim(),
+                      industry: newSupplierIndustry.trim() || undefined,
+                    });
+                    setNewSupplierName('');
+                    setNewSupplierIndustry('');
+                    setShowCreateForm(false);
+                    await loadData(created.supplier_id);
+                    setSelectedSupplierId(created.supplier_id);
+                  } catch (err: any) {
+                    setCreateError(err.message || 'Failed to create supplier profile');
+                  } finally {
+                    setCreating(false);
+                  }
+                }}
+                disabled={creating}
+                className="btn-primary !text-xs"
+              >
+                {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                <span>{creating ? 'Creating Profile…' : 'Create Supplier Profile'}</span>
+              </button>
             </div>
           </div>
-        </div>
+        )}
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => { setShowCreateForm(!showCreateForm); setCreateError(null); }}
-            className="btn-primary"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Supplier</span>
-          </button>
-          <button
-            onClick={() => api.exportReport(selectedSupplierId, 'html').catch(err => alert(err.message))}
-            className="btn-ghost"
-          >
-            <Download className="w-4 h-4" />
-            <span>Export Report</span>
-          </button>
-          <button
-            onClick={() => api.exportReport(selectedSupplierId, 'json').catch(err => alert(err.message))}
-            className="btn-ghost"
-          >
-            <FileJson className="w-4 h-4" />
-            <span>JSON</span>
-          </button>
-          <button
-            onClick={async () => {
-              setLoading(true);
-              try {
-                await api.reanalyze(selectedSupplierId);
-              } catch (err: any) {
-                console.error('Re-analysis failed:', err);
-              }
-              await loadData(selectedSupplierId);
-            }}
-            className="btn-brass"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span>Re-run Analysis</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── New supplier form ─────────────────────────────── */}
-      {showCreateForm && (
-        <div className="card-premium p-5 space-y-4 animate-scale-in">
-          <div className="flex items-center justify-between">
-            <span className="section-label">Onboard New Supplier</span>
-            <button onClick={() => setShowCreateForm(false)} className="p-1 text-stonewarm hover:text-espresso transition-colors rounded-lg">
-              <X className="w-4 h-4" />
-            </button>
+        {/* ── Loading Skeleton (matching real card layout) ─── */}
+        {loading && (
+          <div className="space-y-6 animate-pulse">
+            <div className="card-premium p-8 h-48 bg-cream-100/70 border border-cream-250 flex items-center justify-between">
+              <div className="space-y-3 w-1/2">
+                <div className="h-6 bg-cream-200 rounded-md w-3/4" />
+                <div className="h-4 bg-cream-200 rounded-md w-1/2" />
+                <div className="h-3 bg-cream-200 rounded-md w-1/3" />
+              </div>
+              <div className="w-24 h-24 rounded-full bg-cream-200" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="card-premium p-6 h-64 bg-cream-100/70" />
+              <div className="card-premium p-6 h-64 bg-cream-100/70" />
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input
-              value={newSupplierName}
-              onChange={e => setNewSupplierName(e.target.value)}
-              placeholder="Legal company name *"
-              className="input-premium sm:col-span-2"
-            />
-            <input
-              value={newSupplierIndustry}
-              onChange={e => setNewSupplierIndustry(e.target.value)}
-              placeholder="Industry"
-              className="input-premium"
-            />
-          </div>
-          {createError && <p className="text-xs text-terracotta-deep">{createError}</p>}
-          <button
-            onClick={async () => {
-              if (!newSupplierName.trim()) { setCreateError('Supplier name is required'); return; }
-              setCreating(true);
-              setCreateError(null);
-              try {
-                const created = await api.createSupplier({
-                  name: newSupplierName.trim(),
-                  industry: newSupplierIndustry.trim() || undefined
-                });
-                setNewSupplierName('');
-                setNewSupplierIndustry('');
-                setShowCreateForm(false);
-                await loadData(created.supplier_id);
-                setSelectedSupplierId(created.supplier_id);
-              } catch (err: any) {
-                setCreateError(err.message || 'Failed to create supplier');
-              } finally {
-                setCreating(false);
-              }
-            }}
-            disabled={creating}
-            className="btn-primary"
-          >
-            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            {creating ? 'Creating...' : 'Create Supplier Profile'}
-          </button>
-        </div>
-      )}
+        )}
 
-      {/* ── Alerts ────────────────────────────────────────── */}
-      {!loading && alerts.length > 0 && (
-        <div className="card-premium border-brass/50 animate-rise p-4">
-          <div className="flex items-center gap-2.5 mb-3">
-            <span className="w-8 h-8 rounded-lg bg-[#F3E7C9] border border-brass/40 flex items-center justify-center">
-              <BellRing className="w-4 h-4 text-gold-deep" />
-            </span>
-            <span className="section-label !text-gold-deep">Active Alerts</span>
-          </div>
-          <ul className="space-y-2">
-            {alerts.map((a, idx) => (
-              <li
-                key={idx}
-                className="flex items-start gap-2.5 text-[13px] p-2.5 rounded-xl border animate-fade"
-                style={{
-                  animationDelay: `${idx * 0.06}s`,
-                  borderColor: a.severity === 'danger' ? 'rgba(176,86,58,0.35)' : 'rgba(185,151,91,0.4)',
-                  background: a.severity === 'danger' ? 'rgba(176,86,58,0.06)' : 'rgba(185,151,91,0.08)',
-                }}
-              >
-                <span className={`mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full ${a.severity === 'danger' ? 'bg-terracotta' : 'bg-gold'}`} />
-                <span className={a.severity === 'danger' ? 'text-terracotta-deep' : 'text-gold-deep'}>
-                  <b className="font-semibold">{a.category}:</b> {a.message}
-                  {a.source_reference && <span className="text-stonewarm"> — {a.source_reference}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        {/* ── Tab Content ──────────────────────────────────── */}
+        {!loading && report && graphData && (
+          <>
+            {/* Tab 1: Overview & Audit */}
+            {activeTab === 'dashboard' && (
+              <div className="space-y-6 animate-fade">
+                {/* Screen 3.1: Hero Verdict Banner & Score Ring */}
+                <ScoreCard
+                  report={report}
+                  onOpenVectorAudit={key => setAuditVectorKey(key === 'composite' ? 'identity' : key)}
+                />
 
-      {/* ── Loading state ─────────────────────────────────── */}
-      {loading && (
-        <div className="card-premium py-24 flex flex-col items-center justify-center gap-4 text-brown-600 text-sm animate-fade">
-          <RefreshCw className="w-6 h-6 animate-spin text-olive-600" />
-          <span className="font-display italic text-lg text-espresso">Evaluating multi-vector risk and verifying evidence…</span>
-          <span className="text-xs text-stonewarm">Cross-checking registries, consistency rules and network signals</span>
-        </div>
-      )}
-
-      {/* ── Tab content ───────────────────────────────────── */}
-      {!loading && report && graphData && (
-        <>
-          {activeTab === 'dashboard' && (
-            <div key="dashboard" className="space-y-6 animate-fade">
-              <ScoreCard report={report} />
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="animate-rise" style={{ animationDelay: '0.08s' }}>
-                  <RiskRadar breakdown={report.risk_breakdown} />
+                {/* Vector Breakdown & Dual-Source Conflicts */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="animate-rise" style={{ animationDelay: '0.05s' }}>
+                    <RiskRadar
+                      breakdown={report.risk_breakdown}
+                      onSelectVector={key => setAuditVectorKey(key)}
+                    />
+                  </div>
+                  <div className="animate-rise" style={{ animationDelay: '0.10s' }}>
+                    <FindingsList findings={report.key_findings} />
+                  </div>
                 </div>
-                <div className="animate-rise" style={{ animationDelay: '0.16s' }}>
-                  <FindingsList findings={report.key_findings} />
+
+                {/* Screen 3.4: Grounded Summary & Claim NLI Deconstruction */}
+                <div className="animate-rise" style={{ animationDelay: '0.15s' }}>
+                  <AnalystSummary
+                    report={report}
+                    onReviewRecorded={() => loadData(selectedSupplierId)}
+                  />
                 </div>
               </div>
+            )}
 
-              {/* Evidence basis */}
-              <div className="flex items-center gap-2.5 text-xs animate-rise" style={{ animationDelay: '0.22s' }}>
-                <span className="section-label">Evidence basis</span>
-                <span className={`badge ${
-                  report.data_source === 'UPLOADED_DOCUMENTS' ? 'badge-success'
-                    : report.data_source === 'DEMO_FIXTURES' ? 'badge-info'
-                    : 'badge-danger'
-                }`}>
-                  {report.data_source.replace('_', ' ')}
-                </span>
-                <span className="text-stonewarm">· {report.document_count} uploaded document(s) on file</span>
-              </div>
-
-              <div className="animate-rise" style={{ animationDelay: '0.26s' }}>
-                <AnalystSummary report={report} onReviewRecorded={() => loadData(selectedSupplierId)} />
-              </div>
-
-              <div className="animate-rise" style={{ animationDelay: '0.32s' }}>
-                <DocumentDrawer
+            {/* Tab 2: Documents & Pipeline Stepper */}
+            {activeTab === 'conflicts_docs' && (
+              <div className="space-y-6 animate-fade">
+                <DocumentManager
                   supplierId={selectedSupplierId}
                   onUploadSuccess={() => loadData(selectedSupplierId)}
                 />
+                <FindingsList findings={report.key_findings} />
               </div>
-            </div>
-          )}
+            )}
 
-          {activeTab === 'graph' && (
-            <div key="graph" className="animate-fade">
-              <GraphViewer graphData={graphData} />
-            </div>
-          )}
+            {/* Tab 3: Interactive Relationship Graph */}
+            {activeTab === 'graph' && (
+              <div className="animate-fade">
+                <GraphViewer graphData={graphData} />
+              </div>
+            )}
 
-          {activeTab === 'chat' && (
-            <div key="chat" className="animate-fade">
-              <GroundedChat
-                supplierId={selectedSupplierId}
-                supplierName={report.supplier_name}
-              />
-            </div>
-          )}
+            {/* Tab 4: AI Grounded Analyst Chat */}
+            {activeTab === 'chat' && (
+              <div className="animate-fade">
+                <GroundedChat
+                  supplierId={selectedSupplierId}
+                  supplierName={report.supplier_name}
+                />
+              </div>
+            )}
 
-          {activeTab === 'compare' && (
-            <div key="compare" className="animate-fade">
-              <SupplierCompare
-                suppliers={suppliers}
-                onSelectSupplier={(sid) => {
-                  setSelectedSupplierId(sid);
-                }}
-              />
-            </div>
-          )}
-        </>
-      )}
-    </main>
+            {/* Tab 5: Side-by-Side Tender Compare */}
+            {activeTab === 'compare' && (
+              <div className="animate-fade">
+                <SupplierCompare
+                  suppliers={suppliers}
+                  onSelectSupplier={sid => setSelectedSupplierId(sid)}
+                />
+              </div>
+            )}
+
+            {/* Tab 6: Monitoring & Expiry Watchlist */}
+            {activeTab === 'monitoring' && (
+              <div className="animate-fade">
+                <MonitoringWatchlist
+                  supplierId={selectedSupplierId}
+                  supplierName={report.supplier_name}
+                />
+              </div>
+            )}
+
+            {/* Tab 7: Portfolio Intel */}
+            {activeTab === 'portfolio' && (
+              <div className="animate-fade">
+                <CommandCenter />
+              </div>
+            )}
+          </>
+        )}
+      </main>
+
+      {/* ── Vector Detail Audit Drawer ─────────────────────── */}
+      <VectorDetailDrawer
+        isOpen={!!auditVectorKey}
+        onClose={() => setAuditVectorKey(null)}
+        vectorName={auditVectorKey || ''}
+        detail={activeVectorDetail}
+        score={activeVectorScore}
+      />
+
+      {/* ── Portal Invite Modal ────────────────────────────── */}
+      <PortalInviteModal
+        isOpen={showPortalModal}
+        onClose={() => setShowPortalModal(false)}
+        supplierId={selectedSupplierId}
+        supplierName={report?.supplier_name || 'Active Supplier'}
+      />
+
+      {/* ── Keyboard Shortcuts Modal ───────────────────────── */}
+      <KeyboardShortcutsModal
+        isOpen={showShortcutsModal}
+        onClose={() => setShowShortcutsModal(false)}
+      />
+    </div>
   );
 };
