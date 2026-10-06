@@ -27,6 +27,10 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+from app.core.middleware import RequestIDMiddleware
+
+app.add_middleware(RequestIDMiddleware)
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)

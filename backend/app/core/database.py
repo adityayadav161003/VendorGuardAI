@@ -47,6 +47,16 @@ def init_db():
             if "model_version" not in existing_claim_cols:
                 cursor.execute("ALTER TABLE claims ADD COLUMN model_version VARCHAR(50) DEFAULT 'v2.0.0-trust-core'")
 
+            cursor.execute("PRAGMA table_info(suppliers)")
+            existing_sup_cols = {row[1] for row in cursor.fetchall()}
+            if "organization" not in existing_sup_cols:
+                cursor.execute("ALTER TABLE suppliers ADD COLUMN organization VARCHAR(200) DEFAULT 'GLA Enterprise'")
+
+            cursor.execute("PRAGMA table_info(extracted_entities)")
+            existing_ent_cols = {row[1] for row in cursor.fetchall()}
+            if "bounding_box" not in existing_ent_cols:
+                cursor.execute("ALTER TABLE extracted_entities ADD COLUMN bounding_box JSON DEFAULT NULL")
+
             conn.commit()
             conn.close()
         except Exception:

@@ -200,4 +200,11 @@ class DocumentAIService:
 
         return extracted
 
+    @classmethod
+    def extract_entities(cls, text: str) -> List[Dict[str, Any]]:
+        """Extracts structured statutory entities directly from raw text."""
+        pages = [{"page": 1, "text": text}]
+        results = cls.extract_entities_with_provenance(pages)
+        return [{"type": r["entity_type"], "value": r["entity_value"], "confidence": r["confidence_score"]} for r in results]
+
 document_ai_service = DocumentAIService()

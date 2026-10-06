@@ -30,12 +30,16 @@ class Supplier(Base):
     website = Column(String(255), nullable=True)
     address = Column(Text, nullable=True)
     status = Column(String(50), default="PENDING_REVIEW")  # PENDING_REVIEW, VERIFIED, FLAGGED, REJECTED
+    organization = Column(String(200), default="GLA Enterprise", index=True)
     created_by = Column(String(36), ForeignKey("users.user_id"), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     documents = relationship("Document", back_populates="supplier", cascade="all, delete-orphan")
     analysis_results = relationship("AnalysisResult", back_populates="supplier", cascade="all, delete-orphan")
     risk_reports = relationship("RiskReport", back_populates="supplier", cascade="all, delete-orphan")
+    pipeline_jobs = relationship("PipelineJob", back_populates="supplier", cascade="all, delete-orphan")
+    invites = relationship("SupplierInvite", back_populates="supplier", cascade="all, delete-orphan")
+    timeline_events = relationship("SupplierTimeline", back_populates="supplier", cascade="all, delete-orphan")
 
 class Document(Base):
     __tablename__ = "documents"
@@ -66,6 +70,7 @@ class ExtractedEntity(Base):
     confidence_score = Column(Float, default=1.0)
     page_number = Column(Integer, default=1)
     snippet = Column(Text, nullable=True)  # Provenance snippet (AC2)
+    bounding_box = Column(JSON, nullable=True)  # [x, y, w, h] or None
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     document = relationship("Document", back_populates="extracted_entities")
@@ -189,3 +194,89 @@ class AuditEvent(Base):
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="audit_events")
+
+class PipelineJob(Base):
+    __tablename__ = "pipeline_jobs"
+
+    job_id = Column(String(36), primary_key=True, default=generate_uuid)
+    supplier_id = Column(String(36), ForeignKey("suppliers.supplier_id"), nullable=False)
+    status = Column(String(30), default="PENDING")  # PENDING, RUNNING, COMPLETED, FAILED
+    current_stage = Column(String(50), default="UPLOAD")  # UPLOAD, VALIDATE, OCR, EXTRACT, NORMALISE, CHECKS, ASSESS, REPORT
+    stages_data = Column(JSON, default=dict)
+    failure_reason = Column(Text, nullable=True)
+    retry_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    supplier = relationship("Supplier", back_populates="pipeline_jobs")
+
+class SupplierInvite(Base):
+    __tablename__ = "supplier_invites"
+
+    invite_id = Column(String(36), primary_key=True, default=generate_uuid)
+    supplier_id = Column(String(36), ForeignKey("suppliers.supplier_id"), nullable=False)
+    invite_token = Column(String(64), unique=True, nullable=False, index=True)
+    created_by = Column(String(36), ForeignKey("users.user_id"), nullable=False)
+    required_docs = Column(JSON, default=list)  # ["GST_CERT", "PAN_CARD", "INCORPORATION", "BANK_STATEMENT", "ISO_CERT"]
+    expires_at = Column(DateTime, nullable=False)
+    is_active = Column(Integer, default=1)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    supplier = relationship("Supplier", back_populates="invites")
+
+class SupplierTimeline(Base):
+    __tablename__ = "supplier_timelines"
+
+    timeline_id = Column(String(36), primary_key=True, default=generate_uuid)
+    supplier_id = Column(String(36), ForeignKey("suppliers.supplier_id"), nullable=False)
+    event_type = Column(String(50), nullable=False)  # DOCUMENT_UPLOADED, ANALYSIS_RUN, REVIEW_DECIDED, STATUS_CHANGED, EXPIRY_WARNING
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    metadata_json = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    supplier = relationship("Supplier", back_populates="timeline_events")
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    key_id = Column(String(36), primary_key=True, default=generate_uuid)
+    key_hash = Column(String(64), unique=True, nullable=False, index=True)
+    key_prefix = Column(String(16), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.user_id"), nullable=False)
+    organization = Column(String(200), nullable=False, index=True)
+    scopes = Column(JSON, default=list)  # ["read:reports", "write:documents", "admin"]
+    is_active = Column(Integer, default=1)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class WebhookEndpoint(Base):
+    __tablename__ = "webhook_endpoints"
+
+    endpoint_id = Column(String(36), primary_key=True, default=generate_uuid)
+    organization = Column(String(200), nullable=False, index=True)
+    url = Column(String(500), nullable=False)
+    secret = Column(String(100), nullable=False)
+    events = Column(JSON, default=list)  # ["analysis.completed", "review.decided", "certificate.expiring"]
+    is_active = Column(Integer, default=1)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class PolicyRule(Base):
+    __tablename__ = "policy_rules"
+
+    policy_id = Column(String(36), primary_key=True, default=generate_uuid)
+    organization = Column(String(200), default="GLA Enterprise", index=True)
+    rule_name = Column(String(100), nullable=False)
+    risk_level = Column(String(20), nullable=False)  # HIGH, MEDIUM, LOW
+    required_approvals = Column(Integer, default=1)
+    block_auto_onboard = Column(Integer, default=1)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class EvalBenchmarkRun(Base):
+    __tablename__ = "eval_benchmark_runs"
+
+    run_id = Column(String(36), primary_key=True, default=generate_uuid)
+    run_type = Column(String(50), nullable=False)  # SYNTHETIC_BENCHMARK
+    metrics = Column(JSON, default=dict)
+    sample_count = Column(Integer, default=0)
+    disclaimer = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

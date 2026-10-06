@@ -717,10 +717,18 @@ def export_supplier_report(
     severity_colors = {"success": "#16a34a", "info": "#2563eb", "warning": "#d97706", "danger": "#dc2626"}
     status_colors = {"SUPPORTED": "#16a34a", "CONTRADICTED": "#dc2626", "INSUFFICIENT_EVIDENCE": "#d97706"}
     level_colors = {"LOW": "#16a34a", "MEDIUM": "#d97706", "HIGH": "#dc2626"}
-    esc = html.escape  # every document-derived string is escaped (stored-XSS defence)
-    breakdown_rows = "".join(
-        f"<tr><td>{esc(k.capitalize())}</td><td>{v}</td></tr>" for k, v in report.risk_breakdown.model_dump().items()
-    )
+    esc = html.escape
+    raw_breakdown = report.risk_breakdown.model_dump()
+    vector_map = raw_breakdown.get("vectors") or {}
+
+    breakdown_rows = ""
+    for vname in ["identity", "documents", "financial", "operational", "network", "reputation"]:
+        vdetail = vector_map.get(vname, {})
+        vscore = f"{vdetail.get('score'):.0f}/100" if vdetail.get('score') is not None else "Insufficient Evidence"
+        status_txt = vdetail.get("status", "insufficient").upper()
+        reasons = ", ".join(vdetail.get("reason_codes", [])) or "None"
+        breakdown_rows += f"<tr><td><b>{esc(vname.capitalize())}</b></td><td>{vscore}</td><td>{esc(status_txt)}</td><td><small>{esc(reasons)}</small></td></tr>"
+
     findings_html = "".join(
         f'<li style="color:{severity_colors.get(f.severity, "#111")}">[{esc(f.severity.upper())}] ({esc(f.category)}) '
         f"{esc(f.message)} <em>— {esc(f.source_reference or '')}</em></li>"
@@ -733,22 +741,81 @@ def export_supplier_report(
         for c in report.claims
     )
     generated = report.generated_at.strftime("%d %b %Y %H:%M %Z") if report.generated_at else ""
+    score_display = f"{report.risk_score}/100" if report.risk_score is not None else "N/A (Unassessed)"
+
     html_doc = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>VendorGuard AI Report - {esc(report.supplier_name)}</title>
-<style>body{{font-family:'Segoe UI',Arial,sans-serif;max-width:860px;margin:2rem auto;color:#111}}
-h1{{border-bottom:3px solid #2563eb;padding-bottom:.4rem}} .score{{font-size:2.4rem;font-weight:700}}
-table{{border-collapse:collapse}} td{{border:1px solid #ddd;padding:6px 14px}}
-li{{margin:.5rem 0}} small{{color:#555}} .meta{{color:#666;font-size:.85rem}}</style></head>
+<style>
+@media print {{ body {{ margin: 1cm; }} button {{ display: none; }} }}
+body {{ font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; max-width: 900px; margin: 2rem auto; color: #2B2118; line-height: 1.5; background: #fff; }}
+.header {{ border-bottom: 2px solid #5B7A2F; padding-bottom: 1rem; margin-bottom: 1.5rem; }}
+.badge {{ display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }}
+.badge-danger {{ background: #FDE8E4; color: #B0563A; }}
+.badge-warning {{ background: #FEF3D6; color: #8A6818; }}
+.badge-success {{ background: #EBF3D8; color: #3C4525; }}
+.score {{ font-size: 2.5rem; font-weight: 700; color: #2B2118; margin: 0.5rem 0; }}
+table {{ width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.9rem; }}
+th, td {{ border: 1px solid #D9CEB2; padding: 8px 12px; text-align: left; }}
+th {{ background: #F7F3E8; font-weight: 600; }}
+.meta-box {{ background: #FAF7EE; border: 1px solid #E7DCC3; border-radius: 8px; padding: 12px 16px; margin: 1rem 0; font-size: 0.85rem; }}
+.disclaimer {{ background: #FFF9F0; border-left: 4px solid #C29B4A; padding: 10px 14px; margin-top: 2rem; font-size: 0.8rem; color: #6E5835; }}
+</style></head>
 <body>
-<h1>VendorGuard AI — Supplier Risk Report</h1>
-<p><b>{esc(report.supplier_name)}</b> <span class="meta">(ID {esc(report.supplier_id)}, generated {esc(generated)}, model {esc(report.model_version)})</span></p>
-<p class="score">{report.risk_score}/100 <span style="font-size:1.1rem;color:{level_colors.get(report.risk_level, '#111')}">{esc(report.risk_level)} RISK</span></p>
-<p class="meta">Evidence basis: {esc(report.data_source)} · {report.document_count} uploaded document(s)</p>
-<h2>Analyst Summary</h2><p>{esc(report.summary)}</p>
-<h2>Risk Breakdown</h2><table>{breakdown_rows}</table>
-<h2>Key Findings</h2><ul>{findings_html or '<li>No findings.</li>'}</ul>
-<h2>Verified Claims</h2><ul>{claims_html or '<li>No claims.</li>'}</ul>
-<p class="meta">Decision-support output only — not a legal determination. Every claim links to the evidence it was checked against; claims marked INSUFFICIENT_EVIDENCE remain unverified.</p>
+<div class="header">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <h1 style="margin:0 0 4px 0; color:#2B2118; font-size:1.6rem;">VendorGuard AI — Supplier Risk Report & Verification Dossier</h1>
+      <p style="margin:0; font-size:1.1rem; font-weight:600;">{esc(report.supplier_name)}</p>
+    </div>
+    <span class="badge {'badge-success' if report.assessment_state == 'ASSESSED' else 'badge-warning' if report.assessment_state == 'PROVISIONAL' else 'badge-danger'}">
+      {esc(report.assessment_state)}
+    </span>
+  </div>
+</div>
+
+<div class="meta-box">
+  <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+    <div><strong>Evidence Coverage:</strong> {report.evidence_coverage}%</div>
+    <div><strong>Assessment Confidence:</strong> {report.assessment_confidence}%</div>
+    <div><strong>Uploaded Documents:</strong> {report.document_count}</div>
+    <div><strong>Rule Version:</strong> {esc(report.rule_version or 'v2.0.0-trust-core')}</div>
+  </div>
+  <div style="margin-top:6px; color:#6E5835; font-size:0.8rem;">
+    Generated: {esc(generated)} · Model: {esc(report.model_version)} · Supplier ID: {esc(report.supplier_id)}
+  </div>
+</div>
+
+<div style="display:flex; align-items:center; gap:20px; margin: 1.5rem 0;">
+  <div>
+    <div style="font-size:0.8rem; text-transform:uppercase; color:#6E5835; font-weight:600;">Composite Trust Score</div>
+    <div class="score">{score_display}</div>
+  </div>
+  <div>
+    <span class="badge" style="background:{level_colors.get(report.risk_level, '#eee')}; color:#fff; font-size:0.9rem; padding:4px 10px;">
+      {esc(report.risk_level)} RISK
+    </span>
+  </div>
+</div>
+
+<h2>1. Analyst Summary & Grounded Findings</h2>
+<p>{esc(report.summary)}</p>
+
+<h2>2. Six-Vector Trust Breakdown</h2>
+<table>
+  <thead><tr><th>Vector</th><th>Score</th><th>Status</th><th>Triggered Reason Codes</th></tr></thead>
+  <tbody>{breakdown_rows}</tbody>
+</table>
+
+<h2>3. Key Compliance & Consistency Findings</h2>
+<ul>{findings_html or '<li>No discrepancies detected in submitted evidence.</li>'}</ul>
+
+<h2>4. Verified Claims & Evidence Provenance</h2>
+<ul>{claims_html or '<li>No claims extracted.</li>'}</ul>
+
+<div class="disclaimer">
+  <strong>LEGAL & REGULATORY LIMITATION NOTICE:</strong><br>
+  VendorGuard AI is an evidence-grounded document-review and risk-indicator decision-support system. Decision-support output only; not a legal finding, definitive fraud verdict, or live government agency determination. Every claim presented is linked directly to stored document evidence. Missing evidence is reported as unverified.
+</div>
 </body></html>"""
     return HTMLResponse(
         content=html_doc,

@@ -236,5 +236,10 @@ class ClaimVerifierService:
             "is_evidence_grounded": all_supported,
         }
 
+    def verify_claim(self, claim_text: str, evidence_pool: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Convenience evaluation method returning status mapped as label."""
+        res = self.verify_single_claim(claim_text, evidence_pool)
+        return {"label": res["status"], **res}
+
 
 claim_verifier_service = ClaimVerifierService()
