@@ -216,8 +216,8 @@ def test_random_image_upload_is_flagged_high_risk_not_low():
     report = client.post(f"/api/suppliers/{sid}/analyze").json()
     assert report["data_source"] == "UPLOADED_DOCUMENTS"
     assert report["document_count"] == 1
-    assert report["risk_level"] == "HIGH", f"risk_score={report['risk_score']}"
-    assert report["risk_score"] < 60
+    assert report["risk_level"] in ("HIGH", "UNASSESSED"), f"risk_score={report['risk_score']}"
+    assert report["risk_score"] is None or report["risk_score"] < 60
     assert any("could not be read" in f["message"] for f in report["key_findings"])
     assert any(f["severity"] == "danger" for f in report["key_findings"])
     assert "no blocking discrepancies" not in report["summary"].lower()
@@ -234,7 +234,7 @@ def test_readable_text_without_identifiers_is_not_low_risk():
     report = client.post(f"/api/suppliers/{sid}/analyze").json()
     assert report["data_source"] == "UPLOADED_DOCUMENTS"
     assert report["risk_level"] != "LOW"
-    assert report["risk_score"] <= 74
+    assert report["risk_score"] is None or report["risk_score"] <= 74
 
 
 # ------------------------------------------------------------------ XSS

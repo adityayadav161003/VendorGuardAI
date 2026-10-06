@@ -14,12 +14,15 @@ const LEVEL_COLORS = {
 
 export const ScoreCard: React.FC<ScoreCardProps> = ({ report }) => {
   const score = report.risk_score;
+  const isAssessable = report.assessment_state !== 'NOT_ASSESSABLE' && score !== null;
   const level = (report.risk_level in LEVEL_COLORS ? report.risk_level : 'MEDIUM') as keyof typeof LEVEL_COLORS;
-  const stroke = LEVEL_COLORS[level];
+  const stroke = isAssessable ? LEVEL_COLORS[level] : '#C8BFAC';
 
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
+  const strokeDashoffset = isAssessable && score !== null
+    ? circumference - (score / 100) * circumference
+    : circumference;
 
   return (
     <div className="card-premium card-hover p-6 flex flex-col md:flex-row items-center justify-between gap-6 animate-rise">
@@ -33,29 +36,51 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ report }) => {
             <h2 className="font-display text-[1.55rem] leading-tight font-semibold text-espresso tracking-tight">
               {report.supplier_name}
             </h2>
-            <span className="badge-success">
-              <ShieldCheck className="w-3 h-3" /> Verified GST
-            </span>
+            {report.assessment_state === 'ASSESSED' && (
+              <span className="badge-success">
+                <ShieldCheck className="w-3 h-3" /> Assessed
+              </span>
+            )}
+            {report.assessment_state === 'PROVISIONAL' && (
+              <span className="badge-warning">
+                Provisional Assessment
+              </span>
+            )}
+            {report.assessment_state === 'NOT_ASSESSABLE' && (
+              <span className="badge-danger">
+                Not Assessable
+              </span>
+            )}
+            {report.is_evidence_grounded && (
+              <span className="badge-info">
+                Evidence Grounded
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5 mt-2.5 text-xs text-brown-600">
             <div className="flex items-center gap-1.5">
-              <span className="text-stonewarm">GSTIN:</span>
-              <span className="font-mono text-espresso font-medium">09ABCDE1234F125</span>
-            </div>
-            <div className="flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-brass" />
-              <span>Private Limited</span>
+              <span>Evidence Coverage: <strong className="text-espresso font-mono">{report.evidence_coverage}%</strong></span>
             </div>
             <div className="flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-brass" />
-              <span>Incorporation: 2017</span>
+              <span>Confidence: <strong className="text-espresso font-mono">{report.assessment_confidence}%</strong></span>
             </div>
             <div className="flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-brass" />
-              <span>Noida, UP</span>
+              <span>Docs on file: <strong className="text-espresso">{report.document_count}</strong></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-stonewarm">Rule ver:</span>
+              <span className="font-mono text-espresso">{report.rule_version || 'v2.0.0'}</span>
             </div>
           </div>
+          {report.provisional_reason && (
+            <p className="mt-2 text-xs text-terracotta bg-cream-150 border border-sand-300 rounded px-2 py-1 max-w-xl">
+              {report.provisional_reason}
+            </p>
+          )}
         </div>
       </div>
 
@@ -66,7 +91,7 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ report }) => {
             <defs>
               <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor={stroke} />
-                <stop offset="100%" stopColor="#B9975B" />
+                <stop offset="100%" stopColor={isAssessable ? '#B9975B' : '#C8BFAC'} />
               </linearGradient>
             </defs>
             <circle cx="52" cy="52" r={radius} stroke="#E7DCC3" strokeWidth="8" fill="transparent" />
@@ -84,20 +109,29 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ report }) => {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="font-display text-[1.7rem] leading-none font-semibold text-espresso">{score}</span>
-            <span className="text-[9.5px] text-stonewarm uppercase tracking-[0.16em] font-semibold mt-0.5">/ 100</span>
+            <span className="font-display text-[1.7rem] leading-none font-semibold text-espresso">
+              {score !== null ? score : 'N/A'}
+            </span>
+            <span className="text-[9.5px] text-stonewarm uppercase tracking-[0.16em] font-semibold mt-0.5">
+              {score !== null ? '/ 100' : 'NO SCORE'}
+            </span>
           </div>
         </div>
 
         <div>
           <span className="section-label">Trust Assessment</span>
           <div className={`mt-1.5 badge px-3 py-1 text-xs ${
-            level === 'LOW' ? 'badge-success' : level === 'MEDIUM' ? 'badge-warning' : 'badge-danger'
+            !isAssessable ? 'bg-cream-300 text-espresso border border-sand-400'
+            : level === 'LOW' ? 'badge-success' : level === 'MEDIUM' ? 'badge-warning' : 'badge-danger'
           }`}>
             {report.risk_level} RISK
           </div>
           <p className="text-[11px] text-brown-600 mt-1.5 max-w-[150px] leading-snug">
-            Manual Review Recommended before PO release
+            {report.assessment_state === 'NOT_ASSESSABLE'
+              ? 'Insufficient evidence to compute trust score'
+              : report.assessment_state === 'PROVISIONAL'
+              ? 'Provisional score: review recommended'
+              : 'Manual review recommended before PO release'}
           </p>
         </div>
       </div>

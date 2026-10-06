@@ -11,12 +11,15 @@ sentence it produces against the unified evidence pool before returning it.
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone
 import html
+import json as jsonlib
+import queue
+import threading
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse, HTMLResponse
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.models.entities import (
     Supplier, Document, ExtractedEntity, AnalysisResult, Claim,
     EvidenceSource, RiskReport, ReviewerAction,
@@ -27,6 +30,7 @@ from app.schemas.analysis import (
     ClaimVerification,
     CompareSuppliersRequest,
     AlertResponse,
+    RiskBreakdown,
 )
 from app.services.consistency import consistency_service
 from app.services.graph_engine import graph_engine
@@ -35,7 +39,13 @@ from app.services.claim_verifier import claim_verifier_service
 from app.services.evidence_store import evidence_store
 from app.services.audit import record_event
 from app.core.security import get_current_user, require_roles
-from app.models.entities import User
+from app.services.validators import (
+    validate_gstin,
+    validate_pan,
+    validate_cin,
+    validate_ifsc,
+    cross_check_gstin_pan,
+)
 from data.fixtures.demo_data import DEMO_SUPPLIERS
 
 router = APIRouter()
@@ -120,6 +130,10 @@ def _compose_summary(
     for f in conflicting:
         sentences.append(f["message"] if f["message"].endswith((".", "!", "?")) else f["message"] + ".")
 
+    price_findings = [f for f in consistency_findings if f.get("conflict_type") in ("PRICE_ANOMALY", "PRICE_CONSISTENT")]
+    for f in price_findings:
+        sentences.append(f["message"] if f["message"].endswith((".", "!", "?")) else f["message"] + ".")
+
     holder = profile.get("bank_holder")
     if holder:
         mismatch = any(f.get("conflict_type") == "BANK_NAME_MISMATCH" for f in consistency_findings)
@@ -188,11 +202,18 @@ def _persist_analysis(
 
     db.add(AnalysisResult(
         supplier_id=supplier.supplier_id,
+        assessment_state=report.assessment_state,
+        evidence_coverage=report.evidence_coverage,
+        assessment_confidence=report.assessment_confidence,
+        provisional_reason=report.provisional_reason,
         risk_score=report.risk_score,
         risk_level=report.risk_level,
         summary=report.summary,
         risk_breakdown=report.risk_breakdown.model_dump(),
         key_findings=[f.model_dump() for f in report.key_findings],
+        system_notices=report.system_notices,
+        is_evidence_grounded=1 if report.is_evidence_grounded else 0,
+        rule_version=report.rule_version,
         model_version=report.model_version,
         data_source=report.data_source,
         document_count=report.document_count,
@@ -220,6 +241,7 @@ def _persist_analysis(
             confidence_score=vc.confidence_score,
             evidence_snippet=vc.evidence_snippet,
             source_doc_name=vc.source_doc_name,
+            model_version=report.model_version,
         )
         db.add(row)
         db.flush()
@@ -266,25 +288,49 @@ def _stored_report(db: Session, supplier: Supplier) -> Optional[AnalysisReportRe
         for c in claims
     ]
 
+    breakdown_data = analysis.risk_breakdown or {}
+    try:
+        breakdown_obj = RiskBreakdown(**breakdown_data)
+    except Exception:
+        breakdown_obj = RiskBreakdown()
+
     return AnalysisReportResponse(
         analysis_id=analysis.analysis_id,
         supplier_id=analysis.supplier_id,
         supplier_name=supplier.name,
+        assessment_state=getattr(analysis, "assessment_state", "ASSESSED") or "ASSESSED",
+        evidence_coverage=float(getattr(analysis, "evidence_coverage", 0.0) or 0.0),
+        assessment_confidence=float(getattr(analysis, "assessment_confidence", 0.0) or 0.0),
+        provisional_reason=getattr(analysis, "provisional_reason", None),
         risk_score=analysis.risk_score,
-        risk_level=analysis.risk_level,
+        risk_level=analysis.risk_level or "UNASSESSED",
         summary=analysis.summary or "",
-        risk_breakdown=analysis.risk_breakdown or {},
+        risk_breakdown=breakdown_obj,
         key_findings=[KeyFinding(**f) for f in (analysis.key_findings or [])],
         claims=claim_models,
-        model_version=analysis.model_version,
+        system_notices=getattr(analysis, "system_notices", []) or [],
+        is_evidence_grounded=bool(getattr(analysis, "is_evidence_grounded", 0)),
+        rule_version=getattr(analysis, "rule_version", "v2.0.0-trust-core") or "v2.0.0-trust-core",
+        model_version=analysis.model_version or "v2.0.0-trust-core",
         generated_at=analysis.generated_at,
         data_source=analysis.data_source or "NO_EVIDENCE",
         document_count=analysis.document_count or 0,
     )
 
 
-def run_analysis(db: Session, supplier: Supplier) -> AnalysisReportResponse:
-    """Executes the end-to-end document-driven evaluation pipeline."""
+def run_analysis(db: Session, supplier: Supplier, progress=None) -> AnalysisReportResponse:
+    """Executes the end-to-end document-driven evaluation pipeline.
+
+    `progress(stage, message, pct)` is optional and lets the SSE endpoint
+    stream pipeline stages to the UI in real time."""
+    def _emit(stage: str, message: str, pct: int):
+        if progress:
+            try:
+                progress(stage, message, pct)
+            except Exception:
+                pass
+
+    _emit("intake", "Collecting documents and building the evidence pool", 10)
     pool = evidence_store.build_evidence_pool(db, supplier.supplier_id)
     evidence_pool = pool["evidence_pool"]
     entities = pool["entities"]
@@ -309,10 +355,14 @@ def run_analysis(db: Session, supplier: Supplier) -> AnalysisReportResponse:
         for e in entities
     ]
 
-    # 1. Consistency checks (AC3)
+    # 1. Consistency checks (AC3) + invoice price-anomaly detection
     consistency_findings: List[Dict[str, Any]] = []
     if entity_dicts:
+        _emit("consistency", "Running cross-document consistency checks", 30)
         consistency_findings.extend(consistency_service.check_entity_conflicts_across_documents(entity_dicts))
+        price_check = consistency_service.check_price_anomalies(entity_dicts)
+        if price_check:
+            consistency_findings.append(price_check)
 
     profile: Dict[str, Any] = {}
     if demo_match:
@@ -411,6 +461,7 @@ def run_analysis(db: Session, supplier: Supplier) -> AnalysisReportResponse:
         profile["directors"] = [d["name"] for d in directors]
 
     # 2. Graph intelligence (AC6)
+    _emit("graph", "Building the relationship graph and detecting fraud rings", 50)
     graph_data = graph_engine.build_supplier_subgraph({
         "supplier_id": supplier.supplier_id,
         "name": supplier.name,
@@ -420,7 +471,33 @@ def run_analysis(db: Session, supplier: Supplier) -> AnalysisReportResponse:
     })
     network_signals = graph_data["summary"]["network_signals"]
 
-    # 3. Multi-vector risk scoring (AC5)
+    # Deterministic statutory validation (run before any scoring)
+    if profile.get("gstin"):
+        val_gst = validate_gstin(profile["gstin"])
+        if not val_gst["passed"]:
+            profile["gstin_format_invalid"] = True
+            profile["gstin_verified"] = False
+            consistency_findings.append({
+                "conflict_type": "GSTIN_FORMAT_INVALID",
+                "severity": "danger",
+                "message": f"GSTIN '{profile['gstin']}' failed deterministic statutory validation: {', '.join(val_gst['failed_rules'])}.",
+                "source_a": f"GSTIN: {profile['gstin']}",
+                "source_a_details": {"document_id": None, "page": 1, "snippet": f"GSTIN: {profile['gstin']}", "value": profile['gstin']}
+            })
+    if profile.get("pan"):
+        val_pan = validate_pan(profile["pan"])
+        if not val_pan["passed"]:
+            profile["pan_format_invalid"] = True
+            consistency_findings.append({
+                "conflict_type": "PAN_FORMAT_INVALID",
+                "severity": "danger",
+                "message": f"PAN '{profile['pan']}' failed deterministic validation: {', '.join(val_pan['failed_rules'])}.",
+                "source_a": f"PAN: {profile['pan']}",
+                "source_a_details": {"document_id": None, "page": 1, "snippet": f"PAN: {profile['pan']}", "value": profile['pan']}
+            })
+
+    # 3. Multi-vector risk scoring (AC5) with State Machine & Versioned Rules
+    _emit("risk", "Scoring six risk vectors with state machine", 70)
     has_document_evidence = document_count > 0 or data_source == "DEMO_FIXTURES"
     risk_evaluation = risk_engine.evaluate_supplier_risk(
         supplier_profile=profile,
@@ -432,14 +509,21 @@ def run_analysis(db: Session, supplier: Supplier) -> AnalysisReportResponse:
         total_documents=document_count,
         extracted_entity_count=entity_count,
         data_source=data_source,
+        extracted_entities=entity_dicts,
     )
 
     # 4. Grounded analyst summary + claim-level verification (AC4)
+    _emit("claims", "Composing summary and verifying claims with NLI and notices", 90)
     summary_text = _compose_summary(
         supplier, profile, consistency_findings, network_signals, document_count,
         data_source, unreadable_count=unreadable_count, entity_count=entity_count,
     )
-    verified_claims = claim_verifier_service.verify_analyst_summary(summary_text, evidence_pool)
+    verification_output = claim_verifier_service.verify_analyst_summary(
+        summary_text, evidence_pool, model_version="v2.0.0-trust-core"
+    )
+    verified_claims = verification_output["claims"]
+    system_notices = verification_output["notices"]
+    is_evidence_grounded = verification_output["is_evidence_grounded"]
 
     claim_objects = [
         ClaimVerification(
@@ -460,13 +544,20 @@ def run_analysis(db: Session, supplier: Supplier) -> AnalysisReportResponse:
         analysis_id=f"anl-{supplier.supplier_id}-{int(datetime.now(timezone.utc).timestamp())}",
         supplier_id=supplier.supplier_id,
         supplier_name=supplier.name,
+        assessment_state=risk_evaluation["assessment_state"],
+        evidence_coverage=risk_evaluation["evidence_coverage"],
+        assessment_confidence=risk_evaluation["assessment_confidence"],
+        provisional_reason=risk_evaluation["provisional_reason"],
         risk_score=risk_evaluation["composite_score"],
         risk_level=risk_evaluation["risk_level"],
         summary=summary_text,
         risk_breakdown=risk_evaluation["breakdown"],
         key_findings=risk_evaluation["key_findings"],
         claims=claim_objects,
-        model_version="v1.1-document-driven-baseline",
+        system_notices=system_notices,
+        is_evidence_grounded=is_evidence_grounded,
+        model_version="v2.0.0-trust-core",
+        rule_version=risk_evaluation.get("rule_version", "v2.0.0-trust-core"),
         generated_at=datetime.now(timezone.utc),
         data_source=data_source,
         document_count=document_count,
@@ -477,16 +568,17 @@ def run_analysis(db: Session, supplier: Supplier) -> AnalysisReportResponse:
         if vc.claim_id in claim_id_map:
             vc.claim_id = claim_id_map[vc.claim_id]
 
-    # Auto-flag only until a human decides
+    # Honest supplier status: derived strictly from state + reviewer decisions
+    # Never auto-mark a supplier VERIFIED without explicit reviewer approval
     if supplier.status == "REVIEW_PENDING":
         if report.risk_level == "HIGH":
             supplier.status = "FLAGGED"
-        elif report.risk_level == "LOW":
-            supplier.status = "VERIFIED"
         db.commit()
 
     record_event(db, "ANALYSIS_RUN", supplier.supplier_id, details={
         "risk_score": report.risk_score,
+        "assessment_state": report.assessment_state,
+        "evidence_coverage": report.evidence_coverage,
         "data_source": report.data_source,
         "documents": report.document_count,
     })
@@ -504,6 +596,56 @@ def analyze_supplier(
     """Re-runs the full pipeline: consistency → graph → risk → claim verification."""
     supplier = _resolve_supplier(db, supplier_id)
     return run_analysis(db, supplier)
+
+
+@router.get("/{supplier_id}/analyze/stream")
+def analyze_supplier_stream(
+    supplier_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Server-Sent Events live pipeline: streams each analysis stage as it runs,
+    then the final report. Real-time visibility for the reviewer UI.
+    """
+    supplier = _resolve_supplier(db, supplier_id)  # auth + existence check in request thread
+    supplier_id_confirmed = supplier.supplier_id
+
+    def event_stream():
+        events: "queue.Queue[Optional[Dict[str, Any]]]" = queue.Queue()
+
+        def progress(stage: str, message: str, pct: int):
+            events.put({"stage": stage, "message": message, "progress": pct})
+
+        def worker():
+            worker_db = SessionLocal()
+            try:
+                s = worker_db.query(Supplier).filter(Supplier.supplier_id == supplier_id_confirmed).first()
+                if not s:
+                    events.put({"stage": "error", "message": "Supplier not found", "progress": 100})
+                    return
+                report = run_analysis(worker_db, s, progress=progress)
+                events.put({"stage": "done", "message": "Analysis complete", "progress": 100,
+                            "report": report.model_dump(mode="json")})
+            except Exception as e:
+                events.put({"stage": "error", "message": f"Analysis failed: {e}", "progress": 100})
+            finally:
+                worker_db.close()
+                events.put(None)
+
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+
+        yield 'event: open\ndata: {"stage": "open", "message": "Pipeline connected", "progress": 0}\n\n'
+        while True:
+            item = events.get()
+            if item is None:
+                break
+            yield f"event: {item['stage']}\ndata: {jsonlib.dumps(item)}\n\n"
+        yield 'event: close\ndata: {}\n\n'
+
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @router.get("/{supplier_id}/report", response_model=AnalysisReportResponse)

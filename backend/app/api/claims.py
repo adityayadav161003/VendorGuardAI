@@ -23,7 +23,7 @@ from app.models.entities import User
 
 router = APIRouter()
 
-ALLOWED_REVIEW_ACTIONS = {"APPROVED", "OVERRIDDEN", "REJECTED"}
+ALLOWED_REVIEW_ACTIONS = {"APPROVED", "OVERRIDDEN", "REJECTED", "NEEDS_MORE_EVIDENCE"}
 
 
 @router.post("/verify", response_model=ClaimVerification)
@@ -101,7 +101,8 @@ def review_claim(
     reviewer: User = Depends(require_roles("reviewer")),
 ):
     """Records a human reviewer decision, stored separately from model output."""
-    if payload.action not in ALLOWED_REVIEW_ACTIONS:
+    norm_action = payload.action.strip().upper()
+    if norm_action not in ALLOWED_REVIEW_ACTIONS:
         raise HTTPException(
             status_code=422,
             detail=f"Invalid action '{payload.action}'. Allowed: {', '.join(sorted(ALLOWED_REVIEW_ACTIONS))}",
@@ -114,12 +115,12 @@ def review_claim(
     action = ReviewerAction(
         claim_id=claim.claim_id,
         reviewer_id=reviewer.user_id,
-        action=payload.action,
+        action=norm_action,
         comment=payload.comment,
     )
     db.add(action)
-    record_event(db, f"CLAIM_{payload.action}", claim.claim_id, user_id=reviewer.user_id, details={
-        "claim_text": claim.claim_text[:200],
+    record_event(db, f"CLAIM_{norm_action}", claim.claim_id, user_id=reviewer.user_id, details={
+        "claim_id": claim.claim_id,
         "model_status": claim.status,
     })
     db.commit()

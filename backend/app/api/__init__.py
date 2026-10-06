@@ -6,6 +6,8 @@ from app.api.analysis import router as analysis_router
 from app.api.graph import router as graph_router
 from app.api.claims import router as claims_router
 from app.api.chat import router as chat_router
+from app.api.tenders import router as tenders_router
+from app.api.analytics import router as analytics_router
 
 api_router = APIRouter()
 
@@ -16,3 +18,5 @@ api_router.include_router(analysis_router, prefix="/suppliers", tags=["Analysis 
 api_router.include_router(graph_router, prefix="/suppliers", tags=["Knowledge Graph"])
 api_router.include_router(claims_router, prefix="/claims", tags=["Claim Verification"])
 api_router.include_router(chat_router, prefix="/chat", tags=["AI Analyst Chat"])
+api_router.include_router(tenders_router, prefix="/tenders", tags=["Tender Award Engine"])
+api_router.include_router(analytics_router, prefix="/analytics", tags=["Executive Analytics"])

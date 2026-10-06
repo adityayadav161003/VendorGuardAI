@@ -30,6 +30,7 @@ PATTERNS = {
     "DATE": r"\b([0-9]{1,2}[-/.][0-9]{1,2}[-/.][0-9]{2,4}|[0-9]{4}[-/.][0-9]{1,2}[-/.][0-9]{1,2})\b",
     "ACCOUNT_HOLDER": r"(?:account\s+holder|under\s+name|held\s+by|in\s+the\s+name\s+of|operated\s+by)[\s:]*[\"']?([A-Za-z][A-Za-z0-9&.,'\- ]{2,60}?)[\"']?\s*(?:,|\.|$|\n)",
     "INCORPORATION_YEAR": r"(?:incorporated|registered|established|incorporation\s+date)[^.\n]{0,40}?\b(19[89]\d|20[0-2]\d)\b",
+    "AMOUNT": r"(?:₹|INR|Rs\.?|USD|\$)\s*([0-9]{1,3}(?:[,][0-9]{2,3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)",
 }
 
 # Magic-byte signatures used to verify that file content matches its extension

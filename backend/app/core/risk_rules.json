@@ -1,0 +1,140 @@
+{
+  "rule_version": "v2.0.0-trust-core",
+  "updated_at": "2026-10-06T15:00:00Z",
+  "coverage_thresholds": {
+    "not_assessable_max": 29,
+    "provisional_min": 30,
+    "provisional_max": 69,
+    "assessed_min": 70
+  },
+  "vector_weights": {
+    "identity": 0.20,
+    "documents": 0.20,
+    "financial": 0.20,
+    "operational": 0.15,
+    "network": 0.15,
+    "reputation": 0.10
+  },
+  "rules": {
+    "identity": [
+      {
+        "code": "ID_GSTIN_INVALID_FORMAT",
+        "description": "GSTIN failed deterministic structural or checksum validation",
+        "penalty": 35.0,
+        "severity": "danger"
+      },
+      {
+        "code": "ID_PAN_INVALID_FORMAT",
+        "description": "PAN failed deterministic structural or entity type validation",
+        "penalty": 30.0,
+        "severity": "danger"
+      },
+      {
+        "code": "ID_GSTIN_PAN_MISMATCH",
+        "description": "PAN embedded within GSTIN contradicts supplied PAN card",
+        "penalty": 45.0,
+        "severity": "danger"
+      },
+      {
+        "code": "ID_UNVERIFIED_SOURCE",
+        "description": "Tax identity extracted from document but unverified against official portal",
+        "penalty": 10.0,
+        "severity": "info"
+      }
+    ],
+    "documents": [
+      {
+        "code": "DOC_UNREADABLE_FILES",
+        "description": "Uploaded document is unreadable scan or failed text extraction",
+        "penalty": 35.0,
+        "severity": "danger"
+      },
+      {
+        "code": "DOC_CERTIFICATE_EXPIRED",
+        "description": "Statutory or quality certificate is expired",
+        "penalty": 30.0,
+        "severity": "danger"
+      },
+      {
+        "code": "DOC_CERTIFICATE_EXPIRING_SOON",
+        "description": "Certificate expires within 30 days",
+        "penalty": 10.0,
+        "severity": "warning"
+      },
+      {
+        "code": "DOC_CONFLICTING_FIELDS",
+        "description": "Contradictory values found across uploaded documents",
+        "penalty": 25.0,
+        "severity": "danger"
+      }
+    ],
+    "financial": [
+      {
+        "code": "FIN_BANK_NAME_MISMATCH",
+        "description": "Bank account holder name differs from registered entity legal name",
+        "penalty": 25.0,
+        "severity": "warning"
+      },
+      {
+        "code": "FIN_PRICE_ANOMALY",
+        "description": "Statistically outlying invoice amount detected across submissions",
+        "penalty": 18.0,
+        "severity": "warning"
+      },
+      {
+        "code": "FIN_MISSING_IFSC_STRUCTURE",
+        "description": "Bank IFSC failed standard structural check",
+        "penalty": 15.0,
+        "severity": "warning"
+      }
+    ],
+    "operational": [
+      {
+        "code": "OPS_VINTAGE_UNDER_2_YEARS",
+        "description": "Supplier operational vintage is less than 2 years",
+        "penalty": 20.0,
+        "severity": "warning"
+      },
+      {
+        "code": "OPS_CIN_INVALID_FORMAT",
+        "description": "CIN failed statutory 21-character structure check",
+        "penalty": 15.0,
+        "severity": "warning"
+      }
+    ],
+    "network": [
+      {
+        "code": "NET_SHARED_DIRECTOR",
+        "description": "Shared attribute detected; director linked to multiple external entities; review recommended",
+        "penalty": 20.0,
+        "severity": "warning"
+      },
+      {
+        "code": "NET_SHARED_ADDRESS",
+        "description": "Shared attribute detected; multiple entities registered at same address; review recommended",
+        "penalty": 20.0,
+        "severity": "warning"
+      },
+      {
+        "code": "NET_HIGH_CENTRALITY",
+        "description": "Shared attribute detected; high network centrality across related firms; review recommended",
+        "penalty": 10.0,
+        "severity": "info"
+      }
+    ],
+    "reputation": [
+      {
+        "code": "REP_NEGATIVE_EXTERNAL_REPORT",
+        "description": "Negative review or disputed delivery record found in external sources",
+        "penalty": 12.0,
+        "severity": "warning"
+      },
+      {
+        "code": "REP_SANCTION_OR_DEBARMENT_ALERT",
+        "description": "Public registry or watchlist indicator requiring manual escalation",
+        "penalty": 40.0,
+        "severity": "danger"
+      }
+    ]
+  }
+}

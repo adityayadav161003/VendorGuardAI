@@ -19,7 +19,9 @@ class Settings(BaseModel):
     # Model & Risk Thresholds
     RISK_THRESHOLD_HIGH: float = 75.0
     RISK_THRESHOLD_MEDIUM: float = 50.0
-    CLAIM_NLI_CONFIDENCE_THRESHOLD: float = 0.70
+    CLAIM_NLI_CONFIDENCE_THRESHOLD: float = 0.80
+    RULE_VERSION: str = "v2.0.0-trust-core"
+    DEMO_MODE: bool = os.getenv("DEMO_MODE", "true").lower() in ("1", "true", "yes")
 
     # --- Security & access control ---
     # JWT signing secret: MUST be provided via JWT_SECRET in any real deployment.

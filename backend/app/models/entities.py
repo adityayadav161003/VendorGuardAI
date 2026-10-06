@@ -87,12 +87,19 @@ class AnalysisResult(Base):
 
     analysis_id = Column(String(36), primary_key=True, default=generate_uuid)
     supplier_id = Column(String(36), ForeignKey("suppliers.supplier_id"), nullable=False)
-    risk_score = Column(Float, default=50.0)  # 0 to 100
-    risk_level = Column(String(20), default="MEDIUM")  # LOW, MEDIUM, HIGH
+    assessment_state = Column(String(30), default="ASSESSED")  # NOT_ASSESSABLE, PROVISIONAL, ASSESSED
+    evidence_coverage = Column(Float, default=0.0)  # 0 to 100
+    assessment_confidence = Column(Float, default=0.0)  # 0 to 100 (capped by evidence_coverage)
+    provisional_reason = Column(Text, nullable=True)
+    risk_score = Column(Float, nullable=True)  # null when NOT_ASSESSABLE
+    risk_level = Column(String(20), default="UNASSESSED")  # UNASSESSED, LOW, MEDIUM, HIGH
     summary = Column(Text, nullable=True)
-    risk_breakdown = Column(JSON, default=dict)  # Identity, Document, Financial, Operational, Network, Reputation
+    risk_breakdown = Column(JSON, default=dict)  # Identity, Documents, Financial, Operational, Network, Reputation
     key_findings = Column(JSON, default=list)
-    model_version = Column(String(50), default="v1.0-rules-baseline")
+    system_notices = Column(JSON, default=list)
+    is_evidence_grounded = Column(Integer, default=0)
+    rule_version = Column(String(50), default="v2.0.0-trust-core")
+    model_version = Column(String(50), default="v2.0.0-trust-core")
     data_source = Column(String(30), default="NO_EVIDENCE")  # UPLOADED_DOCUMENTS / DEMO_FIXTURES / NO_EVIDENCE
     document_count = Column(Integer, default=0)
     generated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -108,11 +115,12 @@ class Claim(Base):
     document_id = Column(String(36), ForeignKey("documents.document_id"), nullable=True)
     evidence_id = Column(String(36), ForeignKey("evidence_sources.evidence_id"), nullable=True)
     claim_text = Column(Text, nullable=False)
-    claim_type = Column(String(50), default="VERIFICATION")  # IDENTITY, FINANCIAL, COMPLIANCE, REPUTATION
+    claim_type = Column(String(50), default="FACTUAL_ASSERTION")  # IDENTITY, FINANCIAL, COMPLIANCE, REPUTATION, etc.
     status = Column(String(30), default="SUPPORTED")  # SUPPORTED, CONTRADICTED, INSUFFICIENT_EVIDENCE
     confidence_score = Column(Float, default=0.90)
     evidence_snippet = Column(Text, nullable=True)
     source_doc_name = Column(String(255), nullable=True)
+    model_version = Column(String(50), default="v2.0.0-trust-core")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     analysis = relationship("AnalysisResult", back_populates="claims")
@@ -136,7 +144,7 @@ class RiskReport(Base):
     report_id = Column(String(36), primary_key=True, default=generate_uuid)
     supplier_id = Column(String(36), ForeignKey("suppliers.supplier_id"), nullable=False)
     generated_by = Column(String(100), default="VendorGuard Engine")
-    overall_risk_score = Column(Float, nullable=False)
+    overall_risk_score = Column(Float, nullable=True)
     risk_breakdown = Column(JSON, default=dict)
     key_findings = Column(JSON, default=list)
     recommendation = Column(Text, nullable=True)
@@ -144,6 +152,20 @@ class RiskReport(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     supplier = relationship("Supplier", back_populates="risk_reports")
+
+class TenderEvaluation(Base):
+    """Persisted RFQ award decision: bids, weights and the ranked outcome are
+    stored verbatim so every award recommendation is auditable afterwards."""
+    __tablename__ = "tender_evaluations"
+
+    tender_id = Column(String(36), primary_key=True, default=generate_uuid)
+    quantity = Column(Integer, nullable=False)
+    target_unit_price = Column(Float, nullable=True)
+    deadline_days = Column(Integer, nullable=True)
+    created_by = Column(String(36), nullable=True)
+    result_json = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
 
 class EntityRelation(Base):
     __tablename__ = "entity_relations"

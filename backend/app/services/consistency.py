@@ -22,6 +22,14 @@ STATE_CODES = {
     "36": "Telangana"
 }
 
+from app.services.validators import (
+    validate_gstin,
+    validate_pan,
+    validate_cin,
+    validate_ifsc,
+    cross_check_gstin_pan,
+)
+
 class ConsistencyService:
     @staticmethod
     def normalize_name(name: str) -> str:
@@ -58,36 +66,63 @@ class ConsistencyService:
         return SequenceMatcher(None, norm1, norm2).ratio()
 
     @classmethod
-    def check_gstin_pan_consistency(cls, gstin: Optional[str], pan: Optional[str]) -> Optional[Dict[str, Any]]:
+    def check_gstin_pan_consistency(
+        cls,
+        gstin: Optional[str],
+        pan: Optional[str],
+        gstin_doc_info: Optional[Dict[str, Any]] = None,
+        pan_doc_info: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
         """
         In India, characters 3-12 of a 15-character GSTIN represent the PAN of the entity.
-        AC3: Known cross-document conflicts flagged with both sources.
+        Cross-check validation with deterministic validator.
         """
         if not gstin or not pan:
             return None
 
         gstin_clean = gstin.strip().upper()
         pan_clean = pan.strip().upper()
+        cross_res = cross_check_gstin_pan(gstin_clean, pan_clean)
 
-        if len(gstin_clean) == 15:
-            embedded_pan = gstin_clean[2:12]
-            if embedded_pan != pan_clean:
-                return {
-                    "conflict_type": "GSTIN_PAN_MISMATCH",
-                    "severity": "danger",
-                    "message": f"Critical mismatch: PAN embedded in GSTIN ({embedded_pan}) differs from provided PAN Card ({pan_clean}).",
-                    "source_a": f"GSTIN: {gstin_clean}",
-                    "source_b": f"PAN: {pan_clean}"
-                }
-            else:
-                return {
-                    "conflict_type": "GSTIN_PAN_MATCH",
-                    "severity": "success",
-                    "message": f"Tax Identity verified: PAN ({pan_clean}) aligns with GSTIN ({gstin_clean}).",
-                    "source_a": f"GSTIN: {gstin_clean}",
-                    "source_b": f"PAN: {pan_clean}"
-                }
-        return None
+        doc_a = gstin_doc_info or {}
+        doc_b = pan_doc_info or {}
+
+        source_a_details = {
+            "document_id": doc_a.get("document_id"),
+            "document_name": doc_a.get("document_name", "GST Document"),
+            "page": doc_a.get("page_number", 1),
+            "snippet": doc_a.get("snippet") or f"GSTIN: {gstin_clean}",
+            "value": gstin_clean,
+        }
+        source_b_details = {
+            "document_id": doc_b.get("document_id"),
+            "document_name": doc_b.get("document_name", "PAN Document"),
+            "page": doc_b.get("page_number", 1),
+            "snippet": doc_b.get("snippet") or f"PAN: {pan_clean}",
+            "value": pan_clean,
+        }
+
+        if not cross_res["passed"]:
+            fail_reasons = ", ".join(cross_res["failed_rules"])
+            return {
+                "conflict_type": "GSTIN_PAN_MISMATCH",
+                "severity": "danger",
+                "message": f"Critical mismatch: PAN embedded in GSTIN contradicts provided PAN card ({fail_reasons}).",
+                "source_a": f"GSTIN: {gstin_clean}",
+                "source_b": f"PAN: {pan_clean}",
+                "source_a_details": source_a_details,
+                "source_b_details": source_b_details,
+            }
+        else:
+            return {
+                "conflict_type": "GSTIN_PAN_MATCH",
+                "severity": "success",
+                "message": f"Tax Identity verified: PAN ({pan_clean}) aligns with GSTIN ({gstin_clean}).",
+                "source_a": f"GSTIN: {gstin_clean}",
+                "source_b": f"PAN: {pan_clean}",
+                "source_a_details": source_a_details,
+                "source_b_details": source_b_details,
+            }
 
     @classmethod
     def check_bank_name_consistency(cls, legal_name: str, bank_account_name: str) -> Optional[Dict[str, Any]]:
@@ -193,6 +228,20 @@ class ConsistencyService:
                     ),
                     "source_a": f"{values[0]['entity_value']} ({values[0].get('document_name', '?')}, p.{values[0].get('page_number', 1)})",
                     "source_b": f"{values[1]['entity_value']} ({values[1].get('document_name', '?')}, p.{values[1].get('page_number', 1)})",
+                    "source_a_details": {
+                        "document_id": values[0].get("document_id"),
+                        "document_name": values[0].get("document_name", "?"),
+                        "page": values[0].get("page_number", 1),
+                        "snippet": values[0].get("snippet") or f"{etype}: {values[0]['entity_value']}",
+                        "value": values[0]["entity_value"],
+                    },
+                    "source_b_details": {
+                        "document_id": values[1].get("document_id"),
+                        "document_name": values[1].get("document_name", "?"),
+                        "page": values[1].get("page_number", 1),
+                        "snippet": values[1].get("snippet") or f"{etype}: {values[1]['entity_value']}",
+                        "value": values[1]["entity_value"],
+                    },
                 })
 
         # PAN embedded inside GSTIN (chars 3-12), across any document pair
@@ -215,6 +264,20 @@ class ConsistencyService:
                         ),
                         "source_a": f"GSTIN: {gstin} ({gstins[0].get('document_name', '?')})",
                         "source_b": f"PAN: {pan} ({pans[0].get('document_name', '?')})",
+                        "source_a_details": {
+                            "document_id": gstins[0].get("document_id"),
+                            "document_name": gstins[0].get("document_name", "?"),
+                            "page": gstins[0].get("page_number", 1),
+                            "snippet": gstins[0].get("snippet") or f"GSTIN: {gstin}",
+                            "value": gstin,
+                        },
+                        "source_b_details": {
+                            "document_id": pans[0].get("document_id"),
+                            "document_name": pans[0].get("document_name", "?"),
+                            "page": pans[0].get("page_number", 1),
+                            "snippet": pans[0].get("snippet") or f"PAN: {pan}",
+                            "value": pan,
+                        },
                     })
 
         # Bank account holder vs registered legal name
@@ -237,9 +300,88 @@ class ConsistencyService:
                         "similarity_score": round(sim, 2),
                         "source_a": f"Account holder: {holder} ({holders[0].get('document_name', '?')})",
                         "source_b": f"Legal name: {legal} ({legal_names[0].get('document_name', '?')})",
+                        "source_a_details": {
+                            "document_id": holders[0].get("document_id"),
+                            "document_name": holders[0].get("document_name", "?"),
+                            "page": holders[0].get("page_number", 1),
+                            "snippet": holders[0].get("snippet") or f"Account Holder: {holder}",
+                            "value": holder,
+                        },
+                        "source_b_details": {
+                            "document_id": legal_names[0].get("document_id"),
+                            "document_name": legal_names[0].get("document_name", "?"),
+                            "page": legal_names[0].get("page_number", 1),
+                            "snippet": legal_names[0].get("snippet") or f"Legal Name: {legal}",
+                            "value": legal,
+                        },
                     })
 
         return findings
+
+    @staticmethod
+    def _parse_amount(value: Any) -> Optional[float]:
+        try:
+            return float(str(value).replace(",", "").strip())
+        except (TypeError, ValueError):
+            return None
+
+    def check_price_anomalies(self, entities: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """
+        Flags statistically outlying amounts across uploaded invoices/documents
+        (IQR method, needs >= 4 amounts). Returns one financial finding with
+        the offending document cited, or a success note when prices align.
+        """
+        amounts: List[Dict[str, Any]] = []
+        for ent in entities:
+            if ent.get("entity_type") != "AMOUNT":
+                continue
+            parsed = self._parse_amount(ent.get("entity_value", ""))
+            if parsed and parsed > 0:
+                amounts.append({**ent, "parsed": parsed})
+
+        if len(amounts) < 4:
+            return None
+
+        values = sorted(a["parsed"] for a in amounts)
+        n = len(values)
+
+        def quartile(q: float) -> float:
+            pos = q * (n - 1)
+            low, high = int(pos), min(int(pos) + 1, n - 1)
+            frac = pos - low
+            return values[low] * (1 - frac) + values[high] * frac
+
+        q1, q3 = quartile(0.25), quartile(0.75)
+        iqr = q3 - q1
+        if iqr <= 0:
+            return None
+        lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+
+        outliers = [a for a in amounts if a["parsed"] < lower or a["parsed"] > upper]
+        if not outliers:
+            return {
+                "conflict_type": "PRICE_CONSISTENT",
+                "severity": "success",
+                "message": (
+                    f"All {n} quoted amounts fall within the expected range "
+                    f"({values[0]:,.0f} - {values[-1]:,.0f})."
+                ),
+            }
+
+        out = outliers[0]
+        direction = "above" if out["parsed"] > upper else "below"
+        return {
+            "conflict_type": "PRICE_ANOMALY",
+            "severity": "warning" if out["parsed"] < lower else "danger",
+            "message": (
+                f"Price anomaly: {out['parsed']:,.0f} quoted in \"{out.get('document_name', '?')}\" "
+                f"is far {direction} the typical range "
+                f"({max(lower, values[0]):,.0f} - {min(upper, values[-1]):,.0f}) across {n} amounts. "
+                f"Verify for typos, hidden charges or fraudulent billing."
+            ),
+            "source_a": f"{out.get('document_name', '?')}: {out['parsed']:,.0f}",
+            "source_b": f"Expected range from {n - 1} other document(s)",
+        }
 
     def earliest_expiry_date(self, entities: List[Dict[str, Any]]) -> Optional[str]:
         """Returns the soonest EXPIRY_DATE entity value (most conservative view)."""

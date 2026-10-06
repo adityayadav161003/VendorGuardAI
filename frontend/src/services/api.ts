@@ -1,4 +1,4 @@
-import { Supplier, AnalysisReport, GraphPayload, SupplierAlert, AuthUser } from '../types';
+import { Supplier, AnalysisReport, GraphPayload, SupplierAlert, AuthUser, TenderResult, TenderHistoryItem, AnalyticsOverview, PipelineStage } from '../types';
 
 const API_BASE = '/api';
 
@@ -170,6 +170,69 @@ export const api = {
     }));
     if (!res.ok) throw new Error(await errorDetail(res, 'Failed to record review'));
     return res.json();
+  },
+
+  // ---------------- tender award engine ----------------
+  async evaluateTender(payload: {
+    quantity: number;
+    target_unit_price?: number;
+    deadline_days?: number;
+    bids: Array<{ supplier_id: string; unit_price: number; lead_time_days?: number }>;
+  }): Promise<TenderResult> {
+    const res = await handle(await fetch(`${API_BASE}/tenders/evaluate`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Tender evaluation failed'));
+    return res.json();
+  },
+
+  async getTenderHistory(): Promise<TenderHistoryItem[]> {
+    const res = await handle(await fetch(`${API_BASE}/tenders`, { headers: authHeaders() }));
+    if (!res.ok) throw new Error('Failed to fetch tender history');
+    return res.json();
+  },
+
+  // ---------------- analytics ----------------
+  async getAnalyticsOverview(): Promise<AnalyticsOverview> {
+    const res = await handle(await fetch(`${API_BASE}/analytics/overview`, { headers: authHeaders() }));
+    if (!res.ok) throw new Error('Failed to fetch analytics');
+    return res.json();
+  },
+
+  // ---------------- live analysis pipeline (SSE) ----------------
+  async *streamAnalysis(supplierId: string): AsyncGenerator<PipelineStage> {
+    const res = await fetch(`${API_BASE}/suppliers/${supplierId}/analyze/stream`, {
+      headers: authHeaders()
+    });
+    if (res.status === 401 && onUnauthorized) {
+      localStorage.removeItem(TOKEN_KEY);
+      onUnauthorized();
+      throw new Error('Your session has expired. Please log in again.');
+    }
+    if (!res.ok || !res.body) throw new Error(await errorDetail(res, 'Failed to start live analysis'));
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || '';
+      for (const evt of events) {
+        for (const line of evt.split('\n')) {
+          if (line.startsWith('data: ') && line.length > 10) {
+            try {
+              const parsed = JSON.parse(line.slice(6));
+              if (parsed.stage && parsed.stage !== 'open') yield parsed as PipelineStage;
+            } catch { /* partial chunk */ }
+          }
+        }
+      }
+    }
   },
 
   // ---------------- chat ----------------
