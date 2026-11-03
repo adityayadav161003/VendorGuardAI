@@ -28,6 +28,43 @@ function AuthenticatedApp() {
     }
   }, []);
 
+  // Scroll-reveal: cards glide in as they enter the viewport (SPA view switches included)
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    if (!('IntersectionObserver' in window)) return;
+
+    const io = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            io.unobserve(entry.target);
+          }
+        }
+      },
+      { threshold: 0.06, rootMargin: '0px 0px -36px 0px' },
+    );
+
+    const attach = () => {
+      document
+        .querySelectorAll('.card-premium:not(.reveal-init):not(.animate-rise)')
+        .forEach(el => {
+          el.classList.add('reveal-init');
+          io.observe(el);
+        });
+    };
+
+    attach();
+    const mo = new MutationObserver(attach);
+    const rootEl = document.getElementById('root');
+    if (rootEl) mo.observe(rootEl, { childList: true, subtree: true });
+
+    return () => {
+      io.disconnect();
+      mo.disconnect();
+    };
+  }, []);
+
   // Public-facing supplier portal access (no buyer login required)
   if (portalToken) {
     return (

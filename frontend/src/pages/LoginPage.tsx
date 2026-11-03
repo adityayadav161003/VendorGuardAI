@@ -32,7 +32,7 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-cream-100 flex items-center justify-center px-4 py-10 selection:bg-olive-600 selection:text-cream-50">
-      <div className="w-full max-w-4xl grid lg:grid-cols-[1.05fr_1fr] rounded-3xl overflow-hidden shadow-lifted border border-cream-300 animate-rise">
+      <div className="w-full max-w-4xl grid lg:grid-cols-[1.05fr_1fr] rounded-3xl overflow-hidden shadow-lifted border border-white/60 animate-rise backdrop-blur-2xl">
 
         {/* ── Brand story panel ─────────────────────────────── */}
         <div className="relative bg-espresso text-cream-100 p-10 flex flex-col justify-between overflow-hidden">
@@ -86,7 +86,7 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* ── Form panel ────────────────────────────────────── */}
-        <div className="bg-linen p-10 flex flex-col justify-center">
+        <div className="bg-linen/85 backdrop-blur-xl p-10 flex flex-col justify-center">
           {/* Mode switch */}
           <div className="flex bg-cream-200 border border-cream-300 rounded-xl p-1 mb-8">
             {(['login', 'register'] as const).map(m => (

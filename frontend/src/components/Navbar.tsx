@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { Crest } from './Brand';
@@ -29,11 +30,11 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenS
   const { user, logout } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 bg-espresso/95 backdrop-blur-md border-b border-brown-800/80 shadow-[0_4px_20px_-8px_rgba(33,26,18,0.7)]">
+    <header className="sticky top-0 z-50 glass-dark">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col xl:flex-row items-center justify-between gap-3">
         {/* Brand */}
         <div className="flex items-center gap-3">
-          <Crest className="w-10 h-10" />
+          <Crest className="w-10 h-10 drop-shadow-[0_2px_6px_rgba(185,151,91,0.35)]" />
           <div>
             <div className="flex items-center gap-2">
               <span className="font-display text-xl font-semibold tracking-tight text-cream-100">VendorGuard</span>
@@ -47,23 +48,27 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenS
 
         {/* Tabs + session */}
         <div className="flex items-center gap-3 flex-wrap justify-center">
-          <nav className="flex items-center gap-1 bg-espresso-light/80 border border-brown-800 p-1 rounded-xl overflow-x-auto max-w-full">
+          <nav className="flex items-center gap-1 glass-chip p-1 rounded-xl overflow-x-auto max-w-full">
             {TABS.map(tab => {
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${
+                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer ${
                     isActive
-                      ? 'text-cream-50 bg-olive-700/80 shadow-[0_2px_8px_rgba(60,69,37,0.5)] font-semibold'
-                      : 'text-cream-300/70 hover:text-cream-100 hover:bg-espresso-light'
+                      ? 'text-cream-50 font-semibold'
+                      : 'text-cream-300/70 hover:text-cream-100 hover:bg-white/[0.06]'
                   }`}
                 >
-                  {tab.label}
                   {isActive && (
-                    <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-brass-light rounded-full" />
+                    <motion.span
+                      layoutId="nav-active-pill"
+                      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                      className="absolute inset-0 rounded-lg bg-gradient-to-b from-olive-500/90 to-olive-700/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_4px_12px_-4px_rgba(60,69,37,0.7)]"
+                    />
                   )}
+                  <span className="relative z-10">{tab.label}</span>
                 </button>
               );
             })}
@@ -74,14 +79,14 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenS
               <button
                 onClick={onOpenShortcuts}
                 title="Keyboard Shortcuts (?)"
-                className="px-2 py-1.5 rounded-lg bg-espresso-light/80 border border-brown-800 text-cream-300/70 hover:text-cream-100 text-xs font-mono transition-colors"
+                className="glass-chip px-2.5 py-1.5 text-cream-300/70 hover:text-cream-100 text-xs font-mono transition-colors cursor-pointer"
               >
                 ?
               </button>
             )}
 
             {user && (
-              <div className="flex items-center gap-2.5 bg-espresso-light/80 border border-brown-800 rounded-xl pl-3 pr-1.5 py-1.5">
+              <div className="glass-chip flex items-center gap-2.5 pl-3 pr-1.5 py-1.5">
                 <div className="text-right leading-tight">
                   <div className="text-[11.5px] font-semibold text-cream-100">{user.name}</div>
                   <div className="text-[10px] text-brass-light tracking-wide">{ROLE_LABELS[user.role] || user.role}</div>
