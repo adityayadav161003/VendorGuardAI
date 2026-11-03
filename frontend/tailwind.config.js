@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -57,8 +58,9 @@ export default {
         stonewarm: { DEFAULT: '#8C8371', deep: '#6E6656' },
       },
       fontFamily: {
-        display: ['Fraunces', 'Georgia', 'Cambria', 'serif'],
-        body: ['Outfit', 'Avenir Next', 'Segoe UI', 'sans-serif'],
+        display: ['Fraunces Variable', 'Fraunces', 'Georgia', 'serif'],
+        body: ['Inter Variable', 'Inter', '-apple-system', 'Segoe UI', 'sans-serif'],
+        sans: ['Inter Variable', 'Inter', '-apple-system', 'Segoe UI', 'sans-serif'],
       },
       boxShadow: {
         card: '0 1px 2px rgba(62, 48, 26, 0.06), 0 6px 20px -6px rgba(62, 48, 26, 0.12)',

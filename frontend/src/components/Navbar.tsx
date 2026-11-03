@@ -1,6 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { LogOut } from 'lucide-react';
+import { LogOut, Moon, Sun } from 'lucide-react';
+import { useState } from 'react';
+import { getStoredTheme, toggleTheme, Theme } from '../design/theme';
 import { useAuth } from '../auth/AuthContext';
 import { Crest } from './Brand';
 
@@ -28,6 +30,8 @@ const TABS = [
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenShortcuts }) => {
   const { user, logout } = useAuth();
+  const [theme, setTheme] = useState<Theme>(() => getStoredTheme());
+  const onToggleTheme = () => setTheme(toggleTheme());
 
   return (
     <header className="sticky top-0 z-50 glass-dark">
@@ -75,6 +79,13 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenS
           </nav>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={onToggleTheme}
+              title={theme === 'dark' ? 'Switch to light' : 'Switch to dark'}
+              className="glass-chip px-2 py-1.5 text-cream-300/80 hover:text-cream-100 transition-colors cursor-pointer"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
             {onOpenShortcuts && (
               <button
                 onClick={onOpenShortcuts}
