@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './pages/Dashboard';
 import { LoginPage } from './pages/LoginPage';
+import { LandingPage } from './pages/LandingPage';
 import { SupplierPortalPage } from './pages/SupplierPortalPage';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { AuthProvider, useAuth } from './auth/AuthContext';
@@ -12,6 +13,7 @@ function AuthenticatedApp() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [portalToken, setPortalToken] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [publicView, setPublicView] = useState<'landing' | 'auth'>('landing');
 
   useEffect(() => {
     // Check for tokenized supplier portal URL
@@ -90,7 +92,9 @@ function AuthenticatedApp() {
   }
 
   if (!user) {
-    return <LoginPage />;
+    return publicView === 'auth'
+      ? <LoginPage onBack={() => setPublicView('landing')} />
+      : <LandingPage onEnter={() => setPublicView('auth')} />;
   }
 
   return (

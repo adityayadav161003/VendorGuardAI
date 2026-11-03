@@ -3,7 +3,7 @@ import { LogIn, UserPlus, AlertCircle, Loader2, ShieldCheck, FileSearch, Network
 import { useAuth } from '../auth/AuthContext';
 import { Crest, OliveBranch } from '../components/Brand';
 
-export const LoginPage: React.FC = () => {
+export const LoginPage: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
   const { login, register } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
@@ -106,6 +106,11 @@ export const LoginPage: React.FC = () => {
             ))}
           </div>
 
+          {onBack && (
+            <button onClick={onBack} className="text-[11px] text-brown-600 hover:text-espresso transition-colors mb-4 -mt-2">
+              ← Back to overview
+            </button>
+          )}
           <h1 className="font-display text-2xl font-semibold text-espresso mb-1">
             {mode === 'login' ? 'Welcome back' : 'Request access'}
           </h1>
