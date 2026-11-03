@@ -68,14 +68,16 @@ function AuthenticatedApp() {
         <Dashboard activeTab={activeTab} />
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-cream-300 bg-cream-200/60 py-5 text-center text-xs text-brown-600">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>VendorGuard AI — Decision-Support Document Verification & Risk Intelligence</span>
-          <span>Lead Developer: <strong className="text-espresso">Aditya Yadav</strong> · GLA University</span>
-          <span className="font-mono text-[11px] text-olive-700">repo: adityayadav161003/VendorGuardAI</span>
-        </div>
-      </footer>
+      {/* Footer — academic attribution hidden in product mode (VITE_PRODUCT_MODE=true) */}
+      {import.meta.env.VITE_PRODUCT_MODE !== 'true' && (
+        <footer className="border-t border-cream-300 bg-cream-200/60 py-5 text-center text-xs text-brown-600">
+          <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span>VendorGuard AI — Decision-Support Document Verification & Risk Intelligence</span>
+            <span>Lead Developer: <strong className="text-espresso">Aditya Yadav</strong> · GLA University</span>
+            <span className="font-mono text-[11px] text-olive-700">repo: adityayadav161003/VendorGuardAI</span>
+          </div>
+        </footer>
+      )}
 
       {/* Cheat Sheet Modal */}
       <KeyboardShortcutsModal

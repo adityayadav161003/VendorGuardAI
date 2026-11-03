@@ -113,7 +113,28 @@ The first backend start seeds a bootstrap admin from environment settings:
 
 Change these via `ADMIN_EMAIL` / `ADMIN_PASSWORD` in your environment (see `.env.example`). New self-registered accounts start with least-privilege **procurement** access; reviewer and admin roles are granted by an administrator. All API endpoints except `/health` and `/api/auth/*` require a Bearer token; claim review and supplier status decisions additionally require the **reviewer** or **admin** role.
 
-### 4. Run Automated Evaluation Tests
+### 4. Seed the Demo Workspace
+```bash
+cd backend
+python scripts/seed_demo.py --reset     # --reset wipes the dev DB first
+```
+This drives the **real product pipeline** (upload → OCR → extraction → checks → analysis) to
+create six clearly-labelled synthetic suppliers, each demonstrating one thesis behaviour:
+
+| Profile | What it shows | Expected outcome |
+| --- | --- | --- |
+| DEMO 1 · Veridian Packaging | Complete, consistent documents | `ASSESSED`, healthy score |
+| DEMO 2 · Sunder Textiles | Bank-holder vs legal-name mismatch | `BANK_NAME_MISMATCH` finding |
+| DEMO 3 · ABC Packaging *(fixture)* | Shared-director network | network signal, review recommended |
+| DEMO 4 · Oceanic Polymer | Expired ISO certificate | `EXPIRED` finding, score penalty |
+| DEMO 5 · Barely Known Traders | No documents at all | `NOT_ASSESSABLE`, **no numeric score** |
+| DEMO 6 · Faded Scan Industries | Unreadable scan (image, no OCR) | document `NEEDS_OCR`, supplier `NOT_ASSESSABLE` |
+
+The script asserts the two thesis-critical behaviours (5 and 6) and fails loudly if either
+regresses. Set `VITE_PRODUCT_MODE=true` in `frontend/.env` to hide the academic footer for
+product-style demos.
+
+### 5. Run Automated Evaluation Tests
 ```bash
 cd backend
 pytest -v
