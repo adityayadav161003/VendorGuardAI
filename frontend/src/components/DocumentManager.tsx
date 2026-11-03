@@ -325,7 +325,12 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ supplierId, on
               </div>
 
               {/* Stepper bar */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+              <div
+                className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2"
+                role="status"
+                aria-live="polite"
+                aria-label={`Pipeline stage: ${activeJob.current_stage || 'queued'}`}
+              >
                 {PIPELINE_STAGES.map((stg, i) => {
                   const isDone = currentStageIndex > i || activeJob.status === 'COMPLETED';
                   const isCurrent = activeJob.current_stage === stg.key && activeJob.status !== 'COMPLETED';

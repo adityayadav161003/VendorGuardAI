@@ -213,11 +213,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
           <div className="space-y-6 animate-pulse">
             <div className="card-premium p-8 h-48 bg-cream-100/70 border border-cream-250 flex items-center justify-between">
               <div className="space-y-3 w-1/2">
-                <div className="h-6 bg-cream-200 rounded-md w-3/4" />
-                <div className="h-4 bg-cream-200 rounded-md w-1/2" />
-                <div className="h-3 bg-cream-200 rounded-md w-1/3" />
+                <div className="h-6 skeleton rounded-md w-3/4" />
+                <div className="h-4 skeleton rounded-md w-1/2" />
+                <div className="h-3 skeleton rounded-md w-1/3" />
               </div>
-              <div className="w-24 h-24 rounded-full bg-cream-200" />
+              <div className="w-24 h-24 rounded-full skeleton" />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="card-premium p-6 h-64 bg-cream-100/70" />
