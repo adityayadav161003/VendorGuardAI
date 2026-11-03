@@ -20,6 +20,36 @@ from typing import List, Dict, Any, Tuple
 
 CONFIDENCE_THRESHOLD = 0.80
 
+INJECTION_PATTERNS = [
+    r"(?i)\bignore\s+(?:all\s+)?(?:previous\s+|prior\s+)?instructions\b",
+    r"(?i)\bsystem\s+prompt\b",
+    r"(?i)\bdeveloper\s+(?:mode|instructions|settings)\b",
+    r"(?i)\bbypass\s+(?:all\s+)?(?:rules|safeguards|verification)\b",
+    r"(?i)\bmark\s+(?:this\s+)?(?:vendor|supplier)\s+(?:as\s+)?(?:verified|valid|clean|trusted)\b",
+    r"(?i)\bset\s+(?:the\s+)?(?:risk\s+)?score\s+(?:to\s+)?\d+\b",
+    r"(?i)\byou\s+are\s+now\s+(?:an?\s+)?(?:unrestricted|dan|admin|ai)\b",
+    r"(?i)\bjailbreak\b",
+]
+
+
+def detect_prompt_injection(text: str) -> Dict[str, Any]:
+    """Detects adversarial injection instructions inside text."""
+    if not text:
+        return {"detected": False, "patterns": [], "risk_label": "CLEAN"}
+    matches = []
+    for pat in INJECTION_PATTERNS:
+        found = re.findall(pat, text)
+        if found:
+            matches.extend(found)
+    if matches:
+        return {
+            "detected": True,
+            "patterns": list(set(matches)),
+            "risk_label": "SECURITY_ANOMALY",
+            "message": "Adversarial prompt injection pattern detected in input text.",
+        }
+    return {"detected": False, "patterns": [], "risk_label": "CLEAN"}
+
 
 def sanitize_data_text(text: str) -> str:
     """Hygiene: treat text strictly as data, strip script tags and injection patterns."""
@@ -27,11 +57,8 @@ def sanitize_data_text(text: str) -> str:
         return ""
     cleaned = re.sub(r"<[^>]*>", " ", text)
     cleaned = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", cleaned)
-    cleaned = re.sub(
-        r"(?i)\b(ignore previous instructions|system prompt|developer instructions|bypass rules)\b",
-        "[filtered]",
-        cleaned,
-    )
+    for pat in INJECTION_PATTERNS:
+        cleaned = re.sub(pat, "[FILTERED_INJECTION]", cleaned)
     return " ".join(cleaned.split())
 
 
@@ -49,6 +76,9 @@ META_PATTERNS = [
 
 
 class ClaimVerifierService:
+    sanitize_data_text = staticmethod(sanitize_data_text)
+    detect_prompt_injection = staticmethod(detect_prompt_injection)
+
     def is_meta_statement(self, text: str) -> bool:
         """Determines whether a statement is a system notice / disclaimer rather than a verifiable claim."""
         clean = text.strip()
@@ -109,7 +139,7 @@ class ClaimVerifierService:
         re.IGNORECASE,
     )
     EVIDENCE_NEGATIVE_CUES = re.compile(
-        r"\bmismatch\b|\bdiffers\b|\bconflicting\b|\bnot\s+match\b|\bexpired\b|\bdiscrepanc|\binconsistent\b",
+        r"\bmismatch\b|\bdiffers?\b|\bconflicting\b|\bnot\s+match\b|\bexpired\b|\bdiscrepanc|\binconsistent\b",
         re.IGNORECASE,
     )
     EVIDENCE_POSITIVE_CUES = re.compile(
@@ -155,6 +185,10 @@ class ClaimVerifierService:
                 term_boost += 0.25
             if any(w.startswith("expir") for w in claim_words) and any(w.startswith("expir") for w in ev_words):
                 term_boost += 0.25
+            if (any(w.startswith("bank") for w in claim_words) or any(w.startswith("account") for w in claim_words)) and (any(w.startswith("bank") for w in ev_words) or any(w.startswith("account") for w in ev_words)):
+                term_boost += 0.25
+            if any(w.startswith("differ") for w in claim_words) or any(w.startswith("differ") for w in ev_words):
+                term_boost += 0.20
 
             score = (overlap * 0.70) + (seq_score * 0.30) + term_boost
 

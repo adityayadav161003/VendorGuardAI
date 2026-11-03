@@ -91,6 +91,7 @@ class Citation(BaseModel):
     doc_name: str
     page: int
     snippet: str
+    confidence: Optional[float] = 0.95
 
 class ChatResponse(BaseModel):
     answer: str

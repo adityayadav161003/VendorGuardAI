@@ -132,6 +132,7 @@ export interface Citation {
   doc_name: string;
   page: number;
   snippet: string;
+  confidence?: number;
 }
 
 export interface ChatMessage {

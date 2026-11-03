@@ -410,7 +410,7 @@ class RiskScoringEngine:
         # -------------------------------------------------------------
         rep_ev = get_evidence_ids(["NEWS", "SANCTIONS", "WATCHLIST", "REVIEW"], ["negative", "complaint", "shell", "dormant", "sanction"])
         neg_count = sum(1 for e in external_evidence if any(w in str(e.get("snippet", "")).lower() for w in ["negative", "complaint", "fraud", "shell"]))
-        if not rep_ev and neg_count == 0 and data_source == "NO_EVIDENCE":
+        if not rep_ev and neg_count == 0:
             vector_details["reputation"] = RiskVectorDetail(
                 score=None,
                 status="insufficient",

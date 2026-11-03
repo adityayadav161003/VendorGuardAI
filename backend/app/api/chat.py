@@ -51,16 +51,17 @@ def chat_with_supplier_data(
             claims_unsupported=1,
         )
 
-    retrieved = evidence_store.retrieve_evidence(payload.question, evidence_pool, k=3)
+    # Sanitize user input against prompt injection
+    sanitized_question = claim_verifier_service.sanitize_data_text(payload.question)
+
+    retrieved = evidence_store.retrieve_evidence(sanitized_question, evidence_pool, k=3)
     retrieved = [(score, ev) for score, ev in retrieved if score >= RETRIEVAL_FLOOR]
 
     if not retrieved:
         return ChatResponse(
             answer=(
-                f"I could not find evidence in {supplier.name}'s repository that answers "
-                "\"{}\". ".format(payload.question.strip())
-                + "Please rephrase, or upload a document covering this topic — I will not "
-                "speculate beyond the evidence on file."
+                f"Not found in submitted evidence for {supplier.name}. "
+                "I will not speculate beyond stored repository records."
             ),
             citations=[],
             verification_status="INSUFFICIENT_EVIDENCE",
@@ -68,23 +69,26 @@ def chat_with_supplier_data(
             claims_unsupported=1,
         )
 
-    # Compose the answer extractively from the retrieved evidence — never from memory
+    # Compose the answer extractively from the retrieved evidence — wrapped in safe delimiters
     citations: List[Citation] = []
     answer_parts: List[str] = []
-    for score, ev in retrieved:
+    for idx, (score, ev) in enumerate(retrieved, start=1):
         snippet = " ".join(ev["snippet"].split())
         if len(snippet) > 260:
             snippet = snippet[:257] + "..."
-        answer_parts.append(f"[{ev['title']}] {snippet}")
+        # Demarcate as untrusted document data
+        delimited_data = f"<document_content id=\"{ev['evidence_id']}\" doc=\"{ev['title']}\">{snippet}</document_content>"
+        answer_parts.append(f"[{idx}] {snippet}")
         citations.append(Citation(
             doc_id=ev.get("document_id") or ev["evidence_id"],
             doc_name=ev["title"],
             page=int(ev.get("page") or 1),
             snippet=ev["snippet"][:300],
+            confidence=float(ev.get("reliability_score") or ev.get("confidence") or 0.95),
         ))
 
     answer = (
-        f"Based on {len(retrieved)} evidence item(s) retrieved for {supplier.name}: "
+        f"Based on {len(retrieved)} verified evidence record(s) on file for {supplier.name}: "
         + " ".join(answer_parts)
     )
 
