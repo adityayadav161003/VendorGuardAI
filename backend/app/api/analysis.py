@@ -16,7 +16,7 @@ import queue
 import threading
 
 from fastapi import APIRouter, HTTPException, Depends, Query
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db, SessionLocal
@@ -38,6 +38,7 @@ from app.services.risk_engine import risk_engine
 from app.services.claim_verifier import claim_verifier_service
 from app.services.evidence_store import evidence_store
 from app.services.audit import record_event
+from app.services.report_pdf import build_report_pdf
 from app.core.security import get_current_user, require_roles
 from app.services.validators import (
     validate_gstin,
@@ -712,6 +713,14 @@ def export_supplier_report(
         return JSONResponse(
             content=payload,
             headers={"Content-Disposition": f'attachment; filename="vendorguard-report-{supplier_id}.json"'},
+        )
+
+    if format == "pdf":
+        pdf_bytes = build_report_pdf(report)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="vendorguard-report-{supplier_id}.pdf"'},
         )
 
     severity_colors = {"success": "#16a34a", "info": "#2563eb", "warning": "#d97706", "danger": "#dc2626"}

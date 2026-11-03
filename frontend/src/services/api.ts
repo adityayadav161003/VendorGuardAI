@@ -8,6 +8,9 @@ import {
   TenderHistoryItem,
   AnalyticsOverview,
   PipelineStage,
+  WorkspaceMember,
+  ApiKeyRecord,
+  PolicyRecord,
   ExtractedEntityItem,
   PipelineJob,
   PortalInvite,
@@ -249,6 +252,53 @@ export const api = {
         }
       }
     }
+  },
+
+  // ---------------- admin & settings ----------------
+  async getMembers(): Promise<WorkspaceMember[]> {
+    const res = await handle(await fetch(`${API_BASE}/admin/users`, { headers: authHeaders() }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Failed to fetch members'));
+    return res.json();
+  },
+
+  async updateMemberRole(userId: string, role: string): Promise<WorkspaceMember> {
+    const res = await handle(await fetch(`${API_BASE}/admin/users/${userId}`, {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ role })
+    }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Failed to update role'));
+    return res.json();
+  },
+
+  async listApiKeys(): Promise<ApiKeyRecord[]> {
+    const res = await handle(await fetch(`${API_BASE}/integrations/api-keys`, { headers: authHeaders() }));
+    if (!res.ok) throw new Error('Failed to fetch API keys');
+    return res.json();
+  },
+
+  async createApiKey(name: string): Promise<{ key_id: string; raw_token: string }> {
+    const res = await handle(await fetch(`${API_BASE}/integrations/api-keys`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ name })
+    }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Failed to create API key'));
+    return res.json();
+  },
+
+  async revokeApiKey(keyId: string): Promise<void> {
+    const res = await handle(await fetch(`${API_BASE}/integrations/api-keys/${keyId}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    }));
+    if (!res.ok) throw new Error(await errorDetail(res, 'Failed to revoke key'));
+  },
+
+  async getPolicies(): Promise<PolicyRecord[]> {
+    const res = await handle(await fetch(`${API_BASE}/policies`, { headers: authHeaders() }));
+    if (!res.ok) throw new Error('Failed to fetch policies');
+    return res.json();
   },
 
   // ---------------- chat ----------------

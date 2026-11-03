@@ -311,3 +311,29 @@ export interface EvalRunSummary {
   };
   disclaimer: string;
 }
+
+export interface WorkspaceMember {
+  user_id: string;
+  name: string;
+  email: string;
+  role: 'procurement_officer' | 'reviewer' | 'admin';
+  organization: string;
+  created_at: string;
+}
+
+export interface ApiKeyRecord {
+  key_id: string;
+  name: string;
+  prefix?: string;
+  created_at?: string;
+  revoked?: boolean;
+  scopes?: string[];
+}
+
+export interface PolicyRecord {
+  policy_id?: string;
+  name?: string;
+  key?: string;
+  value?: any;
+  [k: string]: any;
+}

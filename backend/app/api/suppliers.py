@@ -13,9 +13,14 @@ from data.fixtures.demo_data import DEMO_SUPPLIERS
 router = APIRouter()
 
 @router.get("", response_model=List[SupplierResponse])
-def list_suppliers(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_suppliers(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """List all registered suppliers, seeded with demo fixtures if empty."""
-    suppliers = db.query(Supplier).all()
+    suppliers = db.query(Supplier).order_by(Supplier.created_at).offset(max(0, skip)).limit(max(1, min(limit, 200))).all()
     if not suppliers:
         # Seed initial demo suppliers
         for ds in DEMO_SUPPLIERS:

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+import uuid as _uuid
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import SessionLocal, init_db
@@ -34,6 +35,8 @@ app.add_middleware(RequestIDMiddleware)
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
+    request_id = request.headers.get("X-Request-ID") or _uuid.uuid4().hex[:16]
+    response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"

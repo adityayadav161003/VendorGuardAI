@@ -18,7 +18,7 @@ interface NavbarProps {
   onOpenShortcuts?: () => void;
 }
 
-const TABS = [
+const BASE_TABS = [
   { id: 'dashboard', label: 'Overview' },
   { id: 'conflicts_docs', label: 'Documents & Pipeline' },
   { id: 'graph', label: 'Network Graph' },
@@ -30,6 +30,9 @@ const TABS = [
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenShortcuts }) => {
   const { user, logout } = useAuth();
+  const TABS = user?.role === 'admin'
+    ? [...BASE_TABS, { id: 'settings', label: 'Settings' }]
+    : BASE_TABS;
   const [theme, setTheme] = useState<Theme>(() => getStoredTheme());
   const onToggleTheme = () => setTheme(toggleTheme());
 

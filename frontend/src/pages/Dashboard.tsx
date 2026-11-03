@@ -9,6 +9,7 @@ import { GroundedChat } from '../components/GroundedChat';
 import { SupplierCompare } from '../components/SupplierCompare';
 import { MonitoringWatchlist } from '../components/MonitoringWatchlist';
 import { CommandCenter } from '../components/CommandCenter';
+import { SettingsPanel } from '../components/SettingsPanel';
 import { GlobalStatusBar } from '../components/GlobalStatusBar';
 import { SupplierActionBar } from '../components/SupplierActionBar';
 import { VectorDetailDrawer } from '../components/VectorDetailDrawer';
@@ -306,6 +307,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
                   supplierId={selectedSupplierId}
                   supplierName={report.supplier_name}
                 />
+              </div>
+            )}
+
+            {/* Tab 8: Settings (admin only) */}
+            {activeTab === 'settings' && (
+              <div className="animate-fade">
+                <SettingsPanel />
               </div>
             )}
 
