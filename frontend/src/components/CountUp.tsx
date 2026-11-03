@@ -10,14 +10,14 @@ export const CountUp: React.FC<{
 }> = ({ value, duration = 1100, decimals = 0, suffix = '', className = '' }) => {
   const [display, setDisplay] = useState(0);
   const startedRef = useRef(false);
-  const reduced = typeof window !== 'undefined'
-    && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   useEffect(() => {
     if (reduced) {
       setDisplay(value);
       return;
     }
+    if (reduced) { setDisplay(value); return; }
     if (startedRef.current && display === value) return;
     startedRef.current = true;
     const start = performance.now();

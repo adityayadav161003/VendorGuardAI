@@ -240,6 +240,24 @@ body::after {
     @apply tab-premium text-cream-300/80 hover:text-cream-100 hover:bg-white/[0.06];
   }
 
+  /* ---------- Bento spotlight (cursor-aware card glow) ---------- */
+  .bento { position: relative; overflow: hidden; }
+  .bento::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgba(185, 151, 91, 0.12), transparent 62%);
+    opacity: 0;
+    transition: opacity 0.35s var(--ease-entrance);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .bento:hover::before { opacity: 1; }
+  .bento > * { position: relative; z-index: 1; }
+  .dark .bento::before {
+    background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgba(147, 160, 92, 0.10), transparent 62%);
+  }
+
   /* ---------- Skeletons (shaped like final content) ---------- */
   .skeleton {
     @apply rounded-lg;

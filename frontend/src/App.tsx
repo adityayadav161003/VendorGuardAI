@@ -30,6 +30,19 @@ function AuthenticatedApp() {
     }
   }, []);
 
+  // Cursor-aware spotlight on bento cards (single delegated listener)
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement)?.closest?.('.bento') as HTMLElement | null;
+      if (!target) return;
+      const r = target.getBoundingClientRect();
+      target.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      target.style.setProperty('--my', `${e.clientY - r.top}px`);
+    };
+    document.addEventListener('mousemove', onMove, { passive: true });
+    return () => document.removeEventListener('mousemove', onMove);
+  }, []);
+
   // Scroll-reveal: cards glide in as they enter the viewport (SPA view switches included)
   useEffect(() => {
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;

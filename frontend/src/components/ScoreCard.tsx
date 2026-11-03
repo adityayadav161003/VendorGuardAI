@@ -13,6 +13,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { AnalysisReport } from '../types';
+import { CountUp } from './CountUp';
 
 interface ScoreCardProps {
   report: AnalysisReport;
@@ -64,7 +65,8 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ report, onOpenVectorAudit 
   ].filter(Boolean);
 
   return (
-    <div className="card-premium p-6 space-y-6 animate-rise shadow-panel">
+    <div className="card-premium bento p-6 pt-7 space-y-6 animate-rise">
+      <div aria-hidden className="absolute top-0 inset-x-8 h-px bg-gradient-to-r from-transparent via-brass/70 to-transparent" />
       {/* ── Top Row: Identity & Score Ring ───────────────── */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
         {/* Supplier Profile Info */}
@@ -107,26 +109,23 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ report, onOpenVectorAudit 
               )}
             </div>
 
-            {/* Quick Metrics */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5 mt-3 text-xs text-brown-600">
-              <div className="flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-brass" />
-                <span>Coverage: <strong className="text-espresso font-mono font-bold">{report.evidence_coverage}%</strong></span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-brass" />
-                <span>Confidence: <strong className="text-espresso font-mono font-bold">{report.assessment_confidence}%</strong></span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-brass" />
-                <span>Documents: <strong className="text-espresso">{report.document_count}</strong></span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-stonewarm">Rules:</span>
-                <span className="font-mono text-espresso text-[11px] bg-cream-150 px-1.5 py-0.5 rounded border border-cream-300">
-                  {report.rule_version || 'v2.0.0'}
-                </span>
-              </div>
+            {/* KPI row — definition grid, never wraps mid-value */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)]/60 overflow-hidden divide-x divide-[var(--border-subtle)]">
+              {[
+                { label: 'Coverage', value: `${report.evidence_coverage}%` },
+                { label: 'Confidence', value: `${report.assessment_confidence}%` },
+                { label: 'Documents', value: String(report.document_count) },
+                { label: 'Rules', value: report.rule_version || 'v2.0.0' },
+              ].map(k => (
+                <div key={k.label} className="px-4 py-2.5">
+                  <div className="text-[9.5px] uppercase tracking-[0.14em] font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+                    {k.label}
+                  </div>
+                  <div className="text-sm font-bold text-espresso font-mono mt-0.5 truncate" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {k.value}
+                  </div>
+                </div>
+              ))}
             </div>
 
             {report.provisional_reason && (
@@ -144,7 +143,9 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ report, onOpenVectorAudit 
           className="flex items-center gap-5 bg-cream-100/90 border border-cream-300 px-6 py-4 rounded-2xl shrink-0 shadow-panel cursor-pointer hover:border-olive-400 hover:shadow-card transition-all"
         >
           <div className="relative w-[110px] h-[110px] flex items-center justify-center">
-            <svg className="w-[110px] h-[110px] -rotate-90">
+            <div aria-hidden className="absolute -inset-3 rounded-full opacity-70"
+              style={{ background: `radial-gradient(circle, ${stroke}26, transparent 68%)`, filter: 'blur(7px)' }} />
+            <svg className="relative w-[110px] h-[110px] -rotate-90">
               <defs>
                 <linearGradient id="scoreRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor={stroke} />
@@ -166,8 +167,8 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ report, onOpenVectorAudit 
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="font-display text-[1.85rem] leading-none font-bold text-espresso">
-                {score !== null ? score : 'N/A'}
+              <span className="font-display text-[1.85rem] leading-none font-bold text-espresso" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {score !== null ? <CountUp value={score} /> : 'N/A'}
               </span>
               <span className="text-[9.5px] text-stonewarm uppercase tracking-[0.16em] font-bold mt-1">
                 {score !== null ? '/ 100' : 'NO SCORE'}

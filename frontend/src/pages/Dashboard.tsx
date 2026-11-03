@@ -238,15 +238,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
                   onOpenVectorAudit={key => setAuditVectorKey(key === 'composite' ? 'identity' : key)}
                 />
 
-                {/* Vector Breakdown & Dual-Source Conflicts */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="animate-rise" style={{ animationDelay: '0.05s' }}>
+                {/* Vector Breakdown & Dual-Source Conflicts — asymmetric bento */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  <div className="animate-rise lg:col-span-7" style={{ animationDelay: '0.05s' }}>
                     <RiskRadar
                       breakdown={report.risk_breakdown}
                       onSelectVector={key => setAuditVectorKey(key)}
                     />
                   </div>
-                  <div className="animate-rise" style={{ animationDelay: '0.10s' }}>
+                  <div className="animate-rise lg:col-span-5" style={{ animationDelay: '0.10s' }}>
                     <FindingsList findings={report.key_findings} />
                   </div>
                 </div>
